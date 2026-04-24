@@ -88,13 +88,17 @@ export function generatePlan(
 ): ScheduleResult {
   const incomplete = assignments.filter((a) => !a.isCompleted)
 
+  // Midnight of today — unblocked tasks are available from start of day, not current time
+  const todayMidnight = new Date(now)
+  todayMidnight.setHours(0, 0, 0, 0)
+
   // Build queue sorted by priority (highest first)
   const queue: QItem[] = incomplete
     .sort((a, b) => priorityScore(b, projects, now) - priorityScore(a, projects, now))
     .map((a) => ({
       assignment: a,
       remainingMinutes: Math.max(1, a.estimatedMinutes),
-      availableFrom: isBlocked(a, assignments) ? DISTANT_FUTURE : now,
+      availableFrom: isBlocked(a, assignments) ? DISTANT_FUTURE : todayMidnight,
       effectiveDue: effectiveDueDate(a, projects),
     }))
 

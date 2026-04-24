@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { Plus, Search, CheckCircle2, Circle, Star, AlertTriangle } from 'lucide-react'
+import { useState, useMemo, useCallback } from 'react'
+import { Plus, Search, CheckCircle2, Circle, Star } from 'lucide-react'
 import { useStore } from '@/hooks/use-store'
 import { useScheduler } from '@/hooks/use-scheduler'
 import { isAtRisk } from '@/lib/scheduler'
 import { AddTaskSheet } from '@/components/tasks/AddTaskSheet'
+import { TimePromptDialog } from '@/components/tasks/TimePromptDialog'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { Assignment } from '@/types'
@@ -29,8 +29,7 @@ function formatDueDate(iso: string): string {
 }
 
 export default function TasksPage() {
-  const { assignments, groups, projects, completeAssignment, updateAssignment, deleteAssignment } =
-    useStore()
+  const { assignments, groups, projects, completeAssignment, addTimeEntry } = useStore()
   const schedule = useScheduler()
 
   const [search, setSearch] = useState('')
@@ -40,6 +39,27 @@ export default function TasksPage() {
   const [showCompleted, setShowCompleted] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [editTask, setEditTask] = useState<Assignment | undefined>()
+  const [pendingComplete, setPendingComplete] = useState<Assignment | null>(null)
+
+  const handleComplete = useCallback((id: string) => {
+    const a = assignments.find((x) => x.id === id)
+    if (a && !a.isCompleted) setPendingComplete(a)
+  }, [assignments])
+
+  function finishComplete(actualMinutes?: number) {
+    if (!pendingComplete) return
+    if (actualMinutes && actualMinutes > 0) {
+      const endedAt = new Date()
+      const startedAt = new Date(endedAt.getTime() - actualMinutes * 60000)
+      addTimeEntry({
+        assignmentId: pendingComplete.id,
+        startedAt: startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+      })
+    }
+    completeAssignment(pendingComplete.id)
+    setPendingComplete(null)
+  }
 
   const filtered = useMemo(() => {
     return assignments
@@ -158,7 +178,7 @@ export default function TasksPage() {
             >
               {/* Complete button */}
               <button
-                onClick={() => a.isCompleted ? null : completeAssignment(a.id)}
+                onClick={() => handleComplete(a.id)}
                 className="mt-0.5 shrink-0"
               >
                 {a.isCompleted ? (
@@ -228,6 +248,16 @@ export default function TasksPage() {
         onOpenChange={setAddOpen}
         editTask={editTask}
       />
+
+      {pendingComplete && (
+        <TimePromptDialog
+          open={!!pendingComplete}
+          taskTitle={pendingComplete.title}
+          estimatedMinutes={pendingComplete.estimatedMinutes}
+          onSave={(mins) => finishComplete(mins)}
+          onSkip={() => finishComplete()}
+        />
+      )}
     </div>
   )
 }

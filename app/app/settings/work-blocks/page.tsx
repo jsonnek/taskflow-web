@@ -6,10 +6,10 @@ import { useStore } from '@/hooks/use-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { WorkBlock } from '@/types'
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 function formatTime(hour: number, minute: number): string {
   const ampm = hour >= 12 ? 'PM' : 'AM'
@@ -29,13 +29,13 @@ export default function WorkBlocksPage() {
   const [editId, setEditId] = useState<string | null>(null)
 
   const [name, setName] = useState('')
-  const [day, setDay] = useState('2') // Monday
+  const [selectedDays, setSelectedDays] = useState<number[]>([2]) // Monday default
   const [startTime, setStartTime] = useState('15:00')
   const [endTime, setEndTime] = useState('17:00')
 
   function resetForm() {
     setName('')
-    setDay('2')
+    setSelectedDays([2])
     setStartTime('15:00')
     setEndTime('17:00')
     setAdding(false)
@@ -45,7 +45,7 @@ export default function WorkBlocksPage() {
   function openEdit(b: WorkBlock) {
     setEditId(b.id)
     setName(b.name)
-    setDay(String(b.dayOfWeek))
+    setSelectedDays([b.dayOfWeek])
     setStartTime(
       `${b.startHour.toString().padStart(2, '0')}:${b.startMinute.toString().padStart(2, '0')}`
     )
@@ -55,23 +55,42 @@ export default function WorkBlocksPage() {
     setAdding(true)
   }
 
+  function toggleDay(dayNum: number) {
+    setSelectedDays((prev) =>
+      prev.includes(dayNum) ? prev.filter((d) => d !== dayNum) : [...prev, dayNum]
+    )
+  }
+
   function handleSave() {
+    if (selectedDays.length === 0) return
     const start = parseTo24(startTime)
     const end = parseTo24(endTime)
-    const data = {
-      name: name || `${DAYS[Number(day) - 1]} block`,
-      dayOfWeek: Number(day),
-      startHour: start.hour,
-      startMinute: start.minute,
-      endHour: end.hour,
-      endMinute: end.minute,
-    }
 
     if (editId) {
+      // Editing — update the single existing block's time/name, keep its day
       const existing = workBlocks.find((b) => b.id === editId)
-      if (existing) updateWorkBlock({ ...existing, ...data })
+      if (existing) {
+        updateWorkBlock({
+          ...existing,
+          name: name || `${DAY_LABELS[existing.dayOfWeek - 1]} block`,
+          startHour: start.hour,
+          startMinute: start.minute,
+          endHour: end.hour,
+          endMinute: end.minute,
+        })
+      }
     } else {
-      addWorkBlock(data)
+      // Creating — one block per selected day
+      for (const dayNum of selectedDays) {
+        addWorkBlock({
+          name: name || `${DAY_LABELS[dayNum - 1]} block`,
+          dayOfWeek: dayNum,
+          startHour: start.hour,
+          startMinute: start.minute,
+          endHour: end.hour,
+          endMinute: end.minute,
+        })
+      }
     }
     resetForm()
   }
@@ -100,36 +119,43 @@ export default function WorkBlocksPage() {
 
       {/* Add/Edit form */}
       {adding && (
-        <div className="rounded-lg border border-border bg-card p-4 mb-4 space-y-3">
+        <div className="rounded-lg border border-border bg-card p-4 mb-4 space-y-4">
           <p className="text-sm font-medium">{editId ? 'Edit Work Block' : 'New Work Block'}</p>
 
+          {/* Day picker — multi-select when creating */}
+          <div className="space-y-1.5">
+            <Label>
+              {editId ? 'Day' : 'Days'}
+              {!editId && (
+                <span className="ml-1.5 text-xs text-muted-foreground font-normal">
+                  Select one or more
+                </span>
+              )}
+            </Label>
+            <div className="flex gap-1.5 flex-wrap">
+              {DAYS.map((day, i) => {
+                const dayNum = i + 1
+                const selected = selectedDays.includes(dayNum)
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => !editId && toggleDay(dayNum)}
+                    disabled={!!editId}
+                    className={`w-10 h-10 rounded-full text-xs font-medium transition-colors ${
+                      selected
+                        ? 'bg-primary text-primary-foreground'
+                        : 'border border-border hover:bg-muted'
+                    } ${editId ? 'opacity-60 cursor-default' : ''}`}
+                  >
+                    {day}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Day</Label>
-              <Select value={day} onValueChange={(v) => setDay(v ?? "2")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DAYS.map((d, i) => (
-                    <SelectItem key={i} value={String(i + 1)}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="block-name">Name</Label>
-              <Input
-                id="block-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Study session"
-              />
-            </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="start-time">Start</Label>
               <Input
@@ -139,7 +165,6 @@ export default function WorkBlocksPage() {
                 onChange={(e) => setStartTime(e.target.value)}
               />
             </div>
-
             <div className="space-y-1.5">
               <Label htmlFor="end-time">End</Label>
               <Input
@@ -151,9 +176,37 @@ export default function WorkBlocksPage() {
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <Label htmlFor="block-name">
+              Name
+              <span className="ml-1.5 text-xs text-muted-foreground font-normal">optional</span>
+            </Label>
+            <Input
+              id="block-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Study session"
+            />
+          </div>
+
+          {!editId && selectedDays.length > 1 && (
+            <p className="text-xs text-muted-foreground">
+              Will create {selectedDays.length} blocks:{' '}
+              {selectedDays
+                .sort((a, b) => a - b)
+                .map((d) => DAY_LABELS[d - 1])
+                .join(', ')}
+            </p>
+          )}
+
           <div className="flex gap-2">
-            <Button onClick={handleSave} size="sm" className="flex-1">
-              {editId ? 'Save' : 'Add Block'}
+            <Button
+              onClick={handleSave}
+              size="sm"
+              className="flex-1"
+              disabled={selectedDays.length === 0}
+            >
+              {editId ? 'Save' : `Add ${selectedDays.length > 1 ? `${selectedDays.length} Blocks` : 'Block'}`}
             </Button>
             <Button variant="outline" size="sm" onClick={resetForm}>
               Cancel
@@ -180,15 +233,17 @@ export default function WorkBlocksPage() {
                 key={b.id}
                 className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 group"
               >
+                <div className="w-8 text-center shrink-0">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {DAYS[b.dayOfWeek - 1]}
+                  </span>
+                </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{b.name || DAYS[b.dayOfWeek - 1]}</span>
-                    <span className="text-xs text-muted-foreground">{DAYS[b.dayOfWeek - 1]}</span>
-                  </div>
-                  <span className="text-xs mono-nums text-muted-foreground">
+                  <span className="text-sm font-medium">{b.name || DAY_LABELS[b.dayOfWeek - 1]}</span>
+                  <div className="text-xs mono-nums text-muted-foreground">
                     {formatTime(b.startHour, b.startMinute)} – {formatTime(b.endHour, b.endMinute)}
                     {' · '}{duration}m
-                  </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button

@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { CalendarDays, List } from 'lucide-react'
 import { useStore } from '@/hooks/use-store'
 import { useScheduler } from '@/hooks/use-scheduler'
 import { useTimer } from '@/hooks/use-timer'
 import { DayCard } from '@/components/timeline/DayCard'
 import { UnscheduledPanel } from '@/components/timeline/UnscheduledPanel'
+import { TimePromptDialog } from '@/components/tasks/TimePromptDialog'
 import { isAtRisk } from '@/lib/scheduler'
+import type { Assignment } from '@/types'
 
 type ViewMode = 'work-blocks' | 'due-dates'
 
@@ -17,10 +19,13 @@ function formatDueDate(iso: string): string {
 }
 
 export default function TimelinePage() {
-  const { assignments, groups, workBlocks, completeAssignment } = useStore()
+  const { assignments, groups, workBlocks, completeAssignment, addTimeEntry } = useStore()
   const schedule = useScheduler()
   const timer = useTimer()
   const [viewMode, setViewMode] = useState<ViewMode>('work-blocks')
+
+  // Time prompt state
+  const [pendingComplete, setPendingComplete] = useState<Assignment | null>(null)
 
   const unscheduledSet = useMemo(
     () => new Set(schedule.unscheduled.map((a) => a.id)),
@@ -28,6 +33,28 @@ export default function TimelinePage() {
   )
 
   const incomplete = assignments.filter((a) => !a.isCompleted)
+
+  // Intercept completion — show time prompt first
+  const handleComplete = useCallback((id: string) => {
+    const a = assignments.find((x) => x.id === id)
+    if (!a) return
+    setPendingComplete(a)
+  }, [assignments])
+
+  function finishComplete(actualMinutes?: number) {
+    if (!pendingComplete) return
+    if (actualMinutes && actualMinutes > 0) {
+      const endedAt = new Date()
+      const startedAt = new Date(endedAt.getTime() - actualMinutes * 60000)
+      addTimeEntry({
+        assignmentId: pendingComplete.id,
+        startedAt: startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+      })
+    }
+    completeAssignment(pendingComplete.id)
+    setPendingComplete(null)
+  }
 
   // Due-dates view: group by due date
   const byDueDate = useMemo(() => {
@@ -55,7 +82,6 @@ export default function TimelinePage() {
           </p>
         </div>
 
-        {/* View toggle */}
         <div className="flex rounded-lg border border-border overflow-hidden">
           <button
             onClick={() => setViewMode('work-blocks')}
@@ -82,7 +108,6 @@ export default function TimelinePage() {
         </div>
       </div>
 
-      {/* Empty states */}
       {workBlocks.length === 0 && (
         <div className="rounded-lg border border-dashed border-border p-8 text-center mb-6">
           <CalendarDays className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
@@ -93,18 +118,16 @@ export default function TimelinePage() {
         </div>
       )}
 
-      {/* Unscheduled panel */}
       {schedule.unscheduled.length > 0 && (
         <div className="mb-6">
           <UnscheduledPanel
             assignments={schedule.unscheduled}
             groups={groups}
-            onComplete={completeAssignment}
+            onComplete={handleComplete}
           />
         </div>
       )}
 
-      {/* Work blocks view */}
       {viewMode === 'work-blocks' && (
         <div className="space-y-8">
           {schedule.days.length === 0 && workBlocks.length > 0 && (
@@ -117,7 +140,7 @@ export default function TimelinePage() {
               key={dayPlan.date}
               dayPlan={dayPlan}
               groups={groups}
-              onComplete={completeAssignment}
+              onComplete={handleComplete}
               onTimerStart={timer.start}
               onTimerStop={timer.stop}
               activeSessionId={timer.activeSessionId}
@@ -128,7 +151,6 @@ export default function TimelinePage() {
         </div>
       )}
 
-      {/* Due dates view */}
       {viewMode === 'due-dates' && (
         <div className="space-y-6">
           {byDueDate.length === 0 && (
@@ -147,14 +169,8 @@ export default function TimelinePage() {
                   const color = group?.colorHex ?? '#6366F1'
                   const atRisk = isAtRisk(a, schedule.unscheduled)
                   return (
-                    <div
-                      key={a.id}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
-                    >
-                      <div
-                        className="w-1 self-stretch rounded-full shrink-0"
-                        style={{ backgroundColor: color }}
-                      />
+                    <div key={a.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
+                      <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: color }} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium truncate">{a.title}</span>
@@ -166,11 +182,9 @@ export default function TimelinePage() {
                         </div>
                         <span className="text-xs text-muted-foreground">{a.subject || 'General'}</span>
                       </div>
-                      <div className="text-xs mono-nums text-muted-foreground shrink-0">
-                        {a.estimatedMinutes}m
-                      </div>
+                      <div className="text-xs mono-nums text-muted-foreground shrink-0">{a.estimatedMinutes}m</div>
                       <button
-                        onClick={() => completeAssignment(a.id)}
+                        onClick={() => handleComplete(a.id)}
                         className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
                       >
                         Done
@@ -182,6 +196,17 @@ export default function TimelinePage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Time prompt dialog */}
+      {pendingComplete && (
+        <TimePromptDialog
+          open={!!pendingComplete}
+          taskTitle={pendingComplete.title}
+          estimatedMinutes={pendingComplete.estimatedMinutes}
+          onSave={(mins) => finishComplete(mins)}
+          onSkip={() => finishComplete()}
+        />
       )}
     </div>
   )
