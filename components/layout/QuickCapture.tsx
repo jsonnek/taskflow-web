@@ -53,10 +53,10 @@ export function QuickCapture() {
       {/* Floating button */}
       <button
         onClick={openModal}
-        className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:opacity-90 transition-opacity"
+        className="fixed bottom-6 right-6 z-50 w-10 h-10 rounded border border-primary/40 bg-primary/10 text-primary flex items-center justify-center hover:bg-primary/20 hover:border-primary/70 transition-all ring-glow"
         aria-label="Quick capture (⌘K)"
       >
-        <Plus className="w-5 h-5" />
+        <Plus className="w-4 h-4" />
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
