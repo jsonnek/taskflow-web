@@ -1,65 +1,141 @@
-import Image from "next/image";
+import Link from 'next/link'
+import {
+  CalendarDays,
+  BarChart3,
+  Brain,
+  Repeat2,
+  WifiOff,
+  GripVertical,
+  ArrowRight,
+  Zap,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
-export default function Home() {
+const features = [
+  {
+    icon: CalendarDays,
+    title: 'Intelligent Scheduling',
+    description:
+      'Priority scoring (importance × difficulty × urgency) auto-schedules tasks into your work blocks across 28 days.',
+  },
+  {
+    icon: GripVertical,
+    title: 'Drag-to-Reorder',
+    description:
+      'Override the algorithm anytime. Drag sessions within a day to set your own order.',
+  },
+  {
+    icon: BarChart3,
+    title: '9 Analytics Charts',
+    description:
+      'Daily completions, streaks, time accuracy, workload gauge, best-hour heatmap, and momentum score.',
+  },
+  {
+    icon: Brain,
+    title: 'Smart Prediction',
+    description:
+      'Per-subject EWMA correction factors learn from your actual time usage and show predicted durations.',
+  },
+  {
+    icon: Repeat2,
+    title: 'Recurring Tasks',
+    description:
+      'Daily, weekly, specific days, or monthly recurrence with custom intervals and end dates.',
+  },
+  {
+    icon: WifiOff,
+    title: 'Works Offline',
+    description:
+      'All data in localStorage. No account, no server, no latency. Install as a PWA for the full native feel.',
+  },
+]
+
+export default function LandingPage() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Nav */}
+      <header className="h-14 border-b border-border flex items-center justify-between px-6">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
+            <Zap className="w-3.5 h-3.5 text-primary-foreground" />
+          </div>
+          <span className="font-semibold text-sm tracking-tight">Task Flow</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <Link href="/app/timeline">
+          <Button size="sm" variant="outline" className="gap-1.5">
+            Open App <ArrowRight className="w-3.5 h-3.5" />
+          </Button>
+        </Link>
+      </header>
+
+      {/* Hero */}
+      <section className="flex-1 flex flex-col items-center justify-center text-center px-6 py-24">
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground mb-6">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+          No account required · Works instantly
         </div>
-      </main>
+
+        <h1 className="text-5xl font-bold tracking-tight max-w-2xl leading-tight mb-4">
+          Your tasks, intelligently scheduled.
+        </h1>
+
+        <p className="text-lg text-muted-foreground max-w-xl mb-8">
+          Task Flow uses priority scoring and dependency-aware scheduling to fit every assignment
+          into your available time — automatically.
+        </p>
+
+        <Link href="/app/timeline">
+          <Button size="lg" className="gap-2 px-8">
+            Open Task Flow <ArrowRight className="w-4 h-4" />
+          </Button>
+        </Link>
+
+        <p className="mt-4 text-xs text-muted-foreground">
+          All data stored locally in your browser. Zero friction.
+        </p>
+      </section>
+
+      {/* Features */}
+      <section className="border-t border-border px-6 py-16">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-widest text-center mb-10">
+            Features
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map(({ icon: Icon, title, description }) => (
+              <div
+                key={title}
+                className="rounded-lg border border-border p-5 space-y-2 hover:border-foreground/20 transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-md bg-muted flex items-center justify-center">
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-medium">{title}</span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA bottom */}
+      <section className="border-t border-border px-6 py-16 text-center">
+        <h2 className="text-2xl font-bold tracking-tight mb-3">Ready to get started?</h2>
+        <p className="text-muted-foreground mb-6">No sign-up. No subscription. Just open and go.</p>
+        <Link href="/app/timeline">
+          <Button size="lg" className="gap-2 px-10">
+            Open Task Flow <ArrowRight className="w-4 h-4" />
+          </Button>
+        </Link>
+      </section>
+
+      <footer className="border-t border-border px-6 py-4 text-center">
+        <p className="text-xs text-muted-foreground">
+          Task Flow v4.0 · Built with Next.js · All data stays in your browser
+        </p>
+      </footer>
     </div>
-  );
+  )
 }
