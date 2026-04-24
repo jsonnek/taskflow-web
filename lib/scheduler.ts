@@ -145,8 +145,8 @@ export function generatePlan(
         if (item.remainingMinutes <= 0) continue
         if (item.availableFrom > day) continue
 
-        // Expired: past due date
-        if (item.effectiveDue < day) continue
+        // Skip only if due date is strictly in the future AND this day is past it
+        // Overdue tasks (effectiveDue < today) should still be scheduled ASAP
 
         const freeSpace = capacity - bp.usedMinutes
         if (freeSpace <= 0) break
