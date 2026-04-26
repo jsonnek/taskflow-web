@@ -266,7 +266,12 @@ export function AddTaskSheet({ open, onOpenChange, editTask }: AddTaskSheetProps
                     <SectionLabel>Project</SectionLabel>
                     <Select value={projectId} onValueChange={(v) => setProjectId(v ?? '')}>
                       <SelectTrigger className="h-8 text-sm">
-                        <SelectValue placeholder="No project" />
+                        <span className="flex flex-1 text-left truncate text-sm">
+                          {projectId
+                            ? (projects.find(p => p.id === projectId)?.name ?? 'Unknown project')
+                            : <span className="text-muted-foreground">No project</span>
+                          }
+                        </span>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">No project</SelectItem>

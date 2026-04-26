@@ -135,7 +135,12 @@ export default function TasksPage() {
         {projects.length > 0 && (
           <Select value={filterProject} onValueChange={(v) => setFilterProject(v ?? "all")}>
             <SelectTrigger className="w-32 h-8 text-sm">
-              <SelectValue placeholder="Project" />
+              <span className="flex flex-1 text-left truncate text-sm">
+                {filterProject === 'all'
+                  ? <span className="text-muted-foreground">Project</span>
+                  : (projects.find(p => p.id === filterProject)?.name ?? 'Project')
+                }
+              </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All projects</SelectItem>
