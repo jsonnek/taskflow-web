@@ -8,6 +8,7 @@ import { useTimer } from '@/hooks/use-timer'
 import { DayCard } from '@/components/timeline/DayCard'
 import { UnscheduledPanel } from '@/components/timeline/UnscheduledPanel'
 import { TimePromptDialog } from '@/components/tasks/TimePromptDialog'
+import { PgHeader } from '@/components/layout/PgHeader'
 import { isAtRisk } from '@/lib/scheduler'
 import type { Assignment } from '@/types'
 
@@ -72,41 +73,41 @@ export default function TimelinePage() {
   }, [incomplete, viewMode])
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Timeline</h1>
-          <p className="text-sm text-muted-foreground">
-            {schedule.days.length} scheduled days · {schedule.unscheduled.length} unscheduled
-          </p>
-        </div>
-
-        <div className="flex rounded border border-white/15 overflow-hidden">
-          <button
-            onClick={() => setViewMode('work-blocks')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-all ${
-              viewMode === 'work-blocks'
-                ? 'bg-primary/15 text-primary'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            work-blocks
-          </button>
-          <button
-            onClick={() => setViewMode('due-dates')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-all border-l border-white/10 ${
-              viewMode === 'due-dates'
-                ? 'bg-primary/15 text-primary'
-                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-            }`}
-          >
-            <List className="w-3.5 h-3.5" />
-            due-dates
-          </button>
-        </div>
-      </div>
+    <div className="max-w-2xl mx-auto px-6 py-8 page-enter">
+      <PgHeader
+        title="timeline"
+        sub={`${schedule.days.length} days · ${schedule.unscheduled.length} unscheduled`}
+        stats={[
+          { v: schedule.days.length, l: 'days' },
+          { v: schedule.unscheduled.length, l: 'unscheduled' },
+        ]}
+        action={
+          <div className="flex rounded border border-white/15 overflow-hidden">
+            <button
+              onClick={() => setViewMode('work-blocks')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-all ${
+                viewMode === 'work-blocks'
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              work-blocks
+            </button>
+            <button
+              onClick={() => setViewMode('due-dates')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-all border-l border-white/10 ${
+                viewMode === 'due-dates'
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+              }`}
+            >
+              <List className="w-3.5 h-3.5" />
+              due-dates
+            </button>
+          </div>
+        }
+      />
 
       {workBlocks.length === 0 && (
         <div className="rounded-lg border border-dashed border-border p-8 text-center mb-6">

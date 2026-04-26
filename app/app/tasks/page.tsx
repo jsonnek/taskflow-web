@@ -10,6 +10,7 @@ import { TimePromptDialog } from '@/components/tasks/TimePromptDialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { PgHeader } from '@/components/layout/PgHeader'
 import type { Assignment } from '@/types'
 
 function daysUntil(iso: string): number {
@@ -33,6 +34,7 @@ export default function TasksPage() {
   const schedule = useScheduler()
 
   const [search, setSearch] = useState('')
+  const [filterGroup, setFilterGroup] = useState('all')
   const [filterSubject, setFilterSubject] = useState('all')
   const [filterPriority, setFilterPriority] = useState('all')
   const [filterProject, setFilterProject] = useState('all')
@@ -73,6 +75,11 @@ export default function TasksPage() {
         if (showCompleted && !a.isCompleted) return false
         if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false
         if (filterSubject !== 'all' && a.subject !== filterSubject) return false
+        if (filterGroup !== 'all') {
+          const g = groups.find((gr) => gr.id === filterGroup)
+          if (!g) return false
+          if (a.subject !== g.name && a.groupId !== g.id) return false
+        }
         if (filterPriority === 'high' && !a.isPriority) return false
         if (filterProject !== 'all' && a.projectId !== filterProject) return false
         return true
@@ -85,7 +92,7 @@ export default function TasksPage() {
         if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
       })
-  }, [assignments, search, filterSubject, filterPriority, filterProject, showCompleted])
+  }, [assignments, groups, search, filterSubject, filterPriority, filterProject, filterGroup, showCompleted])
 
   const subjects = useMemo(() => {
     const set = new Set(assignments.map((a) => a.subject).filter(Boolean))
@@ -94,21 +101,22 @@ export default function TasksPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Tasks</h1>
-          <p className="text-sm text-muted-foreground">
-            {assignments.filter((a) => !a.isCompleted).length} incomplete · {assignments.filter((a) => a.isCompleted).length} completed
-          </p>
-        </div>
-        <Button size="sm" onClick={() => { setEditTask(undefined); setAddOpen(true) }} className="gap-1.5">
-          <Plus className="w-4 h-4" /> Add Task
-        </Button>
-      </div>
+      <PgHeader
+        title="tasks"
+        sub={`${assignments.filter((a) => !a.isCompleted).length} incomplete · ${assignments.filter((a) => a.isCompleted).length} completed`}
+        stats={[
+          { v: assignments.filter((a) => !a.isCompleted).length, l: 'pending' },
+          { v: assignments.filter((a) => !a.isCompleted && daysUntil(a.dueDate) <= 1).length, l: 'at-risk' },
+        ]}
+        action={
+          <Button size="sm" onClick={() => { setEditTask(undefined); setAddOpen(true) }} className="gap-1.5">
+            <Plus className="w-4 h-4" /> Add Task
+          </Button>
+        }
+      />
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-3">
         <div className="relative flex-1 min-w-40">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
@@ -171,6 +179,38 @@ export default function TasksPage() {
           {showCompleted ? 'completed' : 'incomplete'}
         </button>
       </div>
+
+      {/* Class filter pills */}
+      {groups.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {groups.map((g) => {
+            const count = assignments.filter(
+              (a) => !a.isCompleted && (a.subject === g.name || a.groupId === g.id)
+            ).length
+            const active = filterGroup === g.id
+            if (!count && !active) return null
+            return (
+              <button
+                key={g.id}
+                onClick={() => setFilterGroup((f) => (f === g.id ? 'all' : g.id))}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border transition-all"
+                style={{
+                  borderColor: active ? g.colorHex + '70' : 'var(--border)',
+                  background: active ? g.colorHex + '18' : 'transparent',
+                  color: active ? g.colorHex : 'var(--muted-foreground)',
+                }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                  style={{ background: g.colorHex, boxShadow: active ? `0 0 4px ${g.colorHex}80` : 'none' }}
+                />
+                {g.name.toLowerCase()}
+                {count > 0 && <span className="opacity-70">{count}</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Task list */}
       <div className="space-y-1.5">

@@ -61,7 +61,7 @@ export default function LandingPage() {
           </div>
           <span className="font-semibold text-sm tracking-tight">Task Flow</span>
         </div>
-        <Link href="/app/timeline">
+        <Link href="/app/home">
           <Button size="sm" variant="outline" className="gap-1.5">
             Open App <ArrowRight className="w-3.5 h-3.5" />
           </Button>
@@ -84,7 +84,7 @@ export default function LandingPage() {
           into your available time — automatically.
         </p>
 
-        <Link href="/app/timeline">
+        <Link href="/app/home">
           <Button size="lg" className="gap-2 px-8">
             Open Task Flow <ArrowRight className="w-4 h-4" />
           </Button>
@@ -124,7 +124,7 @@ export default function LandingPage() {
       <section className="border-t border-border px-6 py-16 text-center">
         <h2 className="text-2xl font-bold tracking-tight mb-3">Ready to get started?</h2>
         <p className="text-muted-foreground mb-6">No sign-up. No subscription. Just open and go.</p>
-        <Link href="/app/timeline">
+        <Link href="/app/home">
           <Button size="lg" className="gap-2 px-10">
             Open Task Flow <ArrowRight className="w-4 h-4" />
           </Button>
