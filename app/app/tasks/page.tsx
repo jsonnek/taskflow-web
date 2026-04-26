@@ -246,6 +246,7 @@ export default function TasksPage() {
       </div>
 
       <AddTaskSheet
+        key={editTask?.id ?? 'new'}
         open={addOpen}
         onOpenChange={setAddOpen}
         editTask={editTask}
