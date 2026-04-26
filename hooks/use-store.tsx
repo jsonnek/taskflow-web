@@ -39,6 +39,7 @@ interface StoreActions {
   updateAssignment: (a: Assignment) => void
   deleteAssignment: (id: string) => void
   completeAssignment: (id: string) => void
+  uncompleteAssignment: (id: string) => void
   // Projects
   addProject: (p: Omit<Project, 'id' | 'createdAt'>) => Project
   updateProject: (p: Project) => void
@@ -150,6 +151,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }))
   }, [])
 
+  const uncompleteAssignment = useCallback((id: string) => {
+    const all = assignmentStore.getAll()
+    const a = all.find((x) => x.id === id)
+    if (!a) return
+    assignmentStore.upsert({ ...a, isCompleted: false, completedAt: undefined })
+    setState((s) => ({ ...s, assignments: assignmentStore.getAll() }))
+  }, [])
+
   // Projects
   const addProject = useCallback((data: Omit<Project, 'id' | 'createdAt'>): Project => {
     const p: Project = { ...data, id: nanoid(), createdAt: new Date().toISOString() }
@@ -250,6 +259,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updateAssignment,
         deleteAssignment,
         completeAssignment,
+        uncompleteAssignment,
         addProject,
         updateProject,
         deleteProject,

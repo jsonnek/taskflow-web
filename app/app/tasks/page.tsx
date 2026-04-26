@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Plus, Search, CheckCircle2, Circle, Star } from 'lucide-react'
+import { Plus, Search, CheckCircle2, Circle, Star, RotateCcw } from 'lucide-react'
 import { useStore } from '@/hooks/use-store'
 import { useScheduler } from '@/hooks/use-scheduler'
 import { isAtRisk } from '@/lib/scheduler'
@@ -29,7 +29,7 @@ function formatDueDate(iso: string): string {
 }
 
 export default function TasksPage() {
-  const { assignments, groups, projects, completeAssignment, addTimeEntry } = useStore()
+  const { assignments, groups, projects, completeAssignment, uncompleteAssignment, addTimeEntry } = useStore()
   const schedule = useScheduler()
 
   const [search, setSearch] = useState('')
@@ -43,8 +43,13 @@ export default function TasksPage() {
 
   const handleComplete = useCallback((id: string) => {
     const a = assignments.find((x) => x.id === id)
-    if (a && !a.isCompleted) setPendingComplete(a)
-  }, [assignments])
+    if (!a) return
+    if (a.isCompleted) {
+      uncompleteAssignment(id)
+    } else {
+      setPendingComplete(a)
+    }
+  }, [assignments, uncompleteAssignment])
 
   function finishComplete(actualMinutes?: number) {
     if (!pendingComplete) return
@@ -73,6 +78,10 @@ export default function TasksPage() {
         return true
       })
       .sort((a, b) => {
+        if (showCompleted) {
+          // Most recently completed first
+          return new Date(b.completedAt ?? 0).getTime() - new Date(a.completedAt ?? 0).getTime()
+        }
         if (a.isPriority !== b.isPriority) return a.isPriority ? -1 : 1
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
       })
@@ -90,7 +99,7 @@ export default function TasksPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Tasks</h1>
           <p className="text-sm text-muted-foreground">
-            {assignments.filter((a) => !a.isCompleted).length} incomplete
+            {assignments.filter((a) => !a.isCompleted).length} incomplete · {assignments.filter((a) => a.isCompleted).length} completed
           </p>
         </div>
         <Button size="sm" onClick={() => { setEditTask(undefined); setAddOpen(true) }} className="gap-1.5">
@@ -183,15 +192,19 @@ export default function TasksPage() {
               key={a.id}
               className="flex items-start gap-3 rounded border border-border bg-card p-3 hover:border-white/20 transition-all group"
             >
-              {/* Complete button */}
+              {/* Complete / undo button */}
               <button
                 onClick={() => handleComplete(a.id)}
                 className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                title={a.isCompleted ? 'Mark incomplete' : 'Mark complete'}
               >
                 {a.isCompleted ? (
-                  <CheckCircle2 className="w-4 h-4 text-primary" />
+                  <CheckCircle2 className="w-4 h-4 text-primary group-hover:hidden" />
                 ) : (
                   <Circle className="w-4 h-4" />
+                )}
+                {a.isCompleted && (
+                  <RotateCcw className="w-4 h-4 text-muted-foreground hidden group-hover:block" />
                 )}
               </button>
 
@@ -206,7 +219,7 @@ export default function TasksPage() {
                   <span className={`text-sm font-medium ${a.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
                     {a.title}
                   </span>
-                  {a.isPriority && <Star className="w-3 h-3 text-amber-400 shrink-0" />}
+                  {a.isPriority && !a.isCompleted && <Star className="w-3 h-3 text-amber-400 shrink-0" />}
                   {atRisk && (
                     <span className="text-[10px] font-mono font-medium text-red-400 bg-red-500/15 border border-red-500/30 px-1.5 py-0.5 rounded shrink-0">
                       at-risk
@@ -226,25 +239,45 @@ export default function TasksPage() {
                   {project && (
                     <span className="text-[10px] font-mono text-muted-foreground">{project.name}</span>
                   )}
-                  <span className={`text-[10px] mono-nums ${overdue ? 'text-red-400' : 'text-muted-foreground'}`}>
-                    {formatDueDate(a.dueDate)}
-                  </span>
+                  {a.isCompleted && a.completedAt ? (
+                    <span className="text-[10px] mono-nums text-primary/60">
+                      done {new Date(a.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  ) : (
+                    <span className={`text-[10px] mono-nums ${overdue ? 'text-red-400' : 'text-muted-foreground'}`}>
+                      {formatDueDate(a.dueDate)}
+                    </span>
+                  )}
                   <span className="text-[10px] mono-nums text-muted-foreground">
                     {a.estimatedMinutes}m
                   </span>
-                  <span className="text-[10px] font-mono text-muted-foreground/60">
-                    D:{a.difficulty} I:{a.importance}
-                  </span>
+                  {!a.isCompleted && (
+                    <span className="text-[10px] font-mono text-muted-foreground/60">
+                      D:{a.difficulty} I:{a.importance}
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Edit button */}
-              <button
-                onClick={() => { setEditTask(a); setAddOpen(true) }}
-                className="opacity-0 group-hover:opacity-100 text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all shrink-0"
-              >
-                edit
-              </button>
+              {/* Actions */}
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                {a.isCompleted ? (
+                  <button
+                    onClick={() => uncompleteAssignment(a.id)}
+                    className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all"
+                    title="Restore task"
+                  >
+                    restore
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setEditTask(a); setAddOpen(true) }}
+                    className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all"
+                  >
+                    edit
+                  </button>
+                )}
+              </div>
             </div>
           )
         })}
