@@ -42,6 +42,17 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
   )
 }
 
+// Hex alpha lookup — maps 0-100 opacity to 2-digit hex suffix
+function alphaHex(pct: number) {
+  return Math.round(Math.min(Math.max(pct, 0), 100) * 2.55).toString(16).padStart(2, '0')
+}
+
+// Colour → hex for alpha composition (hardcoded palette)
+const COLOR_HEX: Record<string, string> = {
+  'oklch(0.82 0.12 207)': '#22d3ee', // cyan
+  'oklch(0.68 0.16 290)': '#a78bfa', // purple
+}
+
 // Pure-CSS bar chart
 function BarChart({
   data, color, labelKey, valueKey, unit = '', height = 80,
@@ -55,25 +66,26 @@ function BarChart({
   height?: number
 }) {
   const max = Math.max(...data.map((d) => Number(d[valueKey])), 1)
+  const hex = COLOR_HEX[color] ?? '#22d3ee'
   return (
     <div>
       <div className="flex items-end gap-0.5" style={{ height }}>
         {data.map((d, i) => {
           const v = Number(d[valueKey])
-          const pct = Math.max((v / max) * 100, v > 0 ? 4 : 2)
+          const pct = Math.max((v / max) * 100, v > 0 ? 5 : 2)
           const isMax = v === max && v > 0
-          // vary opacity: 15% at 0, up to 80% at max
-          const opacity = v === 0 ? 8 : 15 + Math.round((v / max) * 65)
+          // empty bars: dim track; filled: 35% → 90% opacity scaling with value
+          const opacity = v === 0 ? 12 : 35 + Math.round((v / max) * 55)
           return (
             <div
               key={i}
-              className="flex-1 rounded-t-sm"
+              className="flex-1 rounded-t-sm transition-all"
               title={unit ? `${v}${unit}` : String(v)}
               style={{
                 height: `${pct}%`,
                 minHeight: 3,
-                background: `oklch(from ${color} l c h / ${opacity}%)`,
-                boxShadow: isMax ? `0 -3px 10px ${color}80` : 'none',
+                background: `${hex}${alphaHex(opacity)}`,
+                boxShadow: isMax ? `0 -4px 12px ${hex}99` : 'none',
               }}
             />
           )
@@ -148,7 +160,7 @@ function Donut({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
-  const { assignments, timeEntries, workBlocks } = useStore()
+  const { assignments, timeEntries, groups, workBlocks } = useStore()
   const schedule = useScheduler()
 
   const completions  = useMemo(() => stats.dailyCompletions(assignments),                            [assignments])
@@ -162,6 +174,18 @@ export default function StatsPage() {
   const onTimePct  = rate.total > 0 ? Math.round(rate.onTimeRate * 100) : 0
   const lateCnt    = rate.completed - rate.onTimeCount
   const remaining  = rate.total - rate.completed
+
+  // Group workload donut — tasks per group as % of total incomplete
+  const groupWorkload = useMemo(() => {
+    const incomplete = assignments.filter((a) => !a.isCompleted)
+    return groups.map((g) => ({
+      label: g.name,
+      color: g.colorHex,
+      value: incomplete.filter((a) => a.subject === g.name || a.groupId === g.id).length,
+    })).filter((g) => g.value > 0)
+  }, [assignments, groups])
+
+  const groupTotal = groupWorkload.reduce((s, g) => s + g.value, 0) || 1
 
   // Heatmap grid: hours 8-17, days Mon-Sun
   const HOURS    = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
@@ -293,31 +317,29 @@ export default function StatsPage() {
             {/* Day headers */}
             <div className="flex mb-1.5 ml-8 gap-0.5">
               {DAYS_ABB.map((d, i) => (
-                <div key={i} className="flex-1 text-center font-mono text-[8px] text-muted-foreground/40">{d}</div>
+                <div key={i} className="flex-1 text-center font-mono text-[8px] text-muted-foreground/50">{d}</div>
               ))}
             </div>
             {/* Hour rows */}
             {HOURS.map((hour) => (
               <div key={hour} className="flex items-center gap-0.5 mb-0.5">
-                <span className="font-mono text-[8px] text-muted-foreground/40 w-7 shrink-0 text-right pr-1">
+                <span className="font-mono text-[8px] text-muted-foreground/50 w-7 shrink-0 text-right pr-1">
                   {hour % 12 || 12}{hour < 12 ? 'a' : 'p'}
                 </span>
                 {Array.from({ length: 7 }, (_, dayIdx) => {
-                  // heatmap uses 0=Sun..6=Sat; our display is Mon-Sun
                   const heatDayIdx = dayIdx === 6 ? 0 : dayIdx + 1
                   const cell = heatmap.find((c) => c.dayIndex === heatDayIdx && c.hour === hour)
                   const intensity = cell ? cell.minutes / heatmapMax : 0
-                  const opacity = intensity === 0 ? 0 : 10 + Math.round(intensity * 65)
+                  // empty: visible dark track; filled: 40% → 95%
+                  const opacity = intensity === 0 ? 18 : 40 + Math.round(intensity * 55)
                   return (
                     <div
                       key={dayIdx}
                       className="flex-1 h-3 rounded-sm"
                       title={cell ? `${cell.minutes}m` : '0m'}
                       style={{
-                        background: intensity === 0
-                          ? C.muted
-                          : `oklch(0.82 0.12 207 / ${opacity}%)`,
-                        boxShadow: intensity > 0.8 ? `0 0 5px oklch(0.82 0.12 207/50%)` : 'none',
+                        background: `#22d3ee${alphaHex(opacity)}`,
+                        boxShadow: intensity > 0.7 ? '0 0 5px #22d3ee80' : 'none',
                       }}
                     />
                   )
@@ -326,6 +348,27 @@ export default function StatsPage() {
             ))}
           </div>
         </ChartCard>
+
+        {/* 5. Workload by class */}
+        {groupWorkload.length > 0 && (
+          <ChartCard title="Workload by Class">
+            <div className="flex items-center gap-6">
+              <Donut segments={groupWorkload} size={108} thickness={14} />
+              <div className="flex flex-col gap-2.5 flex-1 min-w-0">
+                {groupWorkload.map((g) => {
+                  const pct = Math.round((g.value / groupTotal) * 100)
+                  return (
+                    <div key={g.label} className="flex items-center gap-2 min-w-0">
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: g.color }} />
+                      <span className="text-xs text-muted-foreground flex-1 truncate">{g.label}</span>
+                      <span className="font-mono text-xs font-bold text-foreground shrink-0">{pct}%</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </ChartCard>
+        )}
 
       </div>
     </div>
