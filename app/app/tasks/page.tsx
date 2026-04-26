@@ -148,11 +148,13 @@ export default function TasksPage() {
 
         <button
           onClick={() => setShowCompleted((v) => !v)}
-          className={`px-3 py-1 rounded-md text-sm border transition-colors ${
-            showCompleted ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted'
+          className={`px-3 py-1 rounded text-xs font-mono border transition-all ${
+            showCompleted
+              ? 'bg-primary/15 text-primary border-primary/50'
+              : 'border-white/15 text-muted-foreground hover:border-white/25 hover:text-foreground'
           }`}
         >
-          {showCompleted ? 'Completed' : 'Incomplete'}
+          {showCompleted ? 'completed' : 'incomplete'}
         </button>
       </div>
 
@@ -174,17 +176,17 @@ export default function TasksPage() {
           return (
             <div
               key={a.id}
-              className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 hover:border-foreground/20 transition-colors group"
+              className="flex items-start gap-3 rounded border border-border bg-card p-3 hover:border-white/20 transition-all group"
             >
               {/* Complete button */}
               <button
                 onClick={() => handleComplete(a.id)}
-                className="mt-0.5 shrink-0"
+                className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary transition-colors"
               >
                 {a.isCompleted ? (
-                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <CheckCircle2 className="w-4 h-4 text-primary" />
                 ) : (
-                  <Circle className="w-4 h-4 text-muted-foreground hover:text-foreground transition-colors" />
+                  <Circle className="w-4 h-4" />
                 )}
               </button>
 
@@ -199,10 +201,10 @@ export default function TasksPage() {
                   <span className={`text-sm font-medium ${a.isCompleted ? 'line-through text-muted-foreground' : ''}`}>
                     {a.title}
                   </span>
-                  {a.isPriority && <Star className="w-3 h-3 text-amber-500 shrink-0" />}
+                  {a.isPriority && <Star className="w-3 h-3 text-amber-400 shrink-0" />}
                   {atRisk && (
-                    <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded shrink-0">
-                      At Risk
+                    <span className="text-[10px] font-mono font-medium text-red-400 bg-red-500/15 border border-red-500/30 px-1.5 py-0.5 rounded shrink-0">
+                      at-risk
                     </span>
                   )}
                 </div>
@@ -210,22 +212,22 @@ export default function TasksPage() {
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {a.subject && (
                     <span
-                      className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                      className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded"
                       style={{ backgroundColor: color + '22', color }}
                     >
                       {a.subject}
                     </span>
                   )}
                   {project && (
-                    <span className="text-[10px] text-muted-foreground">{project.name}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground">{project.name}</span>
                   )}
-                  <span className={`text-[10px] mono-nums ${overdue ? 'text-red-500' : 'text-muted-foreground'}`}>
+                  <span className={`text-[10px] mono-nums ${overdue ? 'text-red-400' : 'text-muted-foreground'}`}>
                     {formatDueDate(a.dueDate)}
                   </span>
                   <span className="text-[10px] mono-nums text-muted-foreground">
-                    {a.estimatedMinutes}m est.
+                    {a.estimatedMinutes}m
                   </span>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[10px] font-mono text-muted-foreground/60">
                     D:{a.difficulty} I:{a.importance}
                   </span>
                 </div>
@@ -234,9 +236,9 @@ export default function TasksPage() {
               {/* Edit button */}
               <button
                 onClick={() => { setEditTask(a); setAddOpen(true) }}
-                className="opacity-0 group-hover:opacity-100 text-xs text-muted-foreground hover:text-foreground transition-all shrink-0"
+                className="opacity-0 group-hover:opacity-100 text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all shrink-0"
               >
-                Edit
+                edit
               </button>
             </div>
           )

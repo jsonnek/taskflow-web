@@ -82,28 +82,28 @@ export default function TimelinePage() {
           </p>
         </div>
 
-        <div className="flex rounded-lg border border-border overflow-hidden">
+        <div className="flex rounded border border-white/15 overflow-hidden">
           <button
             onClick={() => setViewMode('work-blocks')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-all ${
               viewMode === 'work-blocks'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-muted text-muted-foreground'
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
             }`}
           >
             <CalendarDays className="w-3.5 h-3.5" />
-            Work Blocks
+            work-blocks
           </button>
           <button
             onClick={() => setViewMode('due-dates')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors border-l border-border ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-all border-l border-white/10 ${
               viewMode === 'due-dates'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-muted text-muted-foreground'
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
             }`}
           >
             <List className="w-3.5 h-3.5" />
-            Due Dates
+            due-dates
           </button>
         </div>
       </div>
@@ -169,25 +169,25 @@ export default function TimelinePage() {
                   const color = group?.colorHex ?? '#6366F1'
                   const atRisk = isAtRisk(a, schedule.unscheduled)
                   return (
-                    <div key={a.id} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3">
-                      <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: color }} />
+                    <div key={a.id} className="flex items-center gap-3 rounded border border-border bg-card p-3 hover:border-white/20 transition-all group">
+                      <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ backgroundColor: color }} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium truncate">{a.title}</span>
                           {atRisk && (
-                            <span className="text-[10px] font-medium text-red-600 shrink-0 bg-red-50 px-1.5 py-0.5 rounded">
-                              At Risk
+                            <span className="text-[10px] font-mono font-medium text-red-400 shrink-0 bg-red-500/15 border border-red-500/30 px-1.5 py-0.5 rounded">
+                              at-risk
                             </span>
                           )}
                         </div>
-                        <span className="text-xs text-muted-foreground">{a.subject || 'General'}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground">{a.subject || 'general'}</span>
                       </div>
-                      <div className="text-xs mono-nums text-muted-foreground shrink-0">{a.estimatedMinutes}m</div>
+                      <div className="text-[10px] mono-nums text-muted-foreground shrink-0">{a.estimatedMinutes}m</div>
                       <button
                         onClick={() => handleComplete(a.id)}
-                        className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                        className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all shrink-0 opacity-0 group-hover:opacity-100"
                       >
-                        Done
+                        done
                       </button>
                     </div>
                   )

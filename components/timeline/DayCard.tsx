@@ -57,7 +57,7 @@ export function DayCard({
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{date}</span>
           {isOverScheduled && (
-            <span className="flex items-center gap-1 text-amber-600 font-medium">
+            <span className="flex items-center gap-1 text-amber-400 font-medium">
               <AlertTriangle className="w-3 h-3" />
               Over-scheduled
             </span>
@@ -67,7 +67,7 @@ export function DayCard({
 
       {/* Over-scheduled warning */}
       {isOverScheduled && (
-        <div className="flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+        <div className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-400">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           More work scheduled than available time today.
         </div>

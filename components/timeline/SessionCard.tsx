@@ -1,8 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { Clock, Play, Square, CheckCircle2, AlertTriangle } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { Clock, Play, Square, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScheduledSession, TaskGroup } from '@/types'
 
@@ -54,38 +52,39 @@ export function SessionCard({
   return (
     <div
       className={cn(
-        'flex items-start gap-3 rounded-lg border border-border bg-card p-3 hover:border-foreground/20 transition-colors group',
-        isAtRisk && 'border-red-500/50 bg-red-50/5'
+        'flex items-start gap-3 rounded border border-border bg-card p-3 hover:border-white/20 transition-all group',
+        isAtRisk && 'border-red-500/40',
+        isActiveTimer && 'border-primary/40 bg-primary/5'
       )}
     >
-      {/* Color accent */}
+      {/* Color accent strip */}
       <div
-        className="w-1 self-stretch rounded-full shrink-0"
+        className="w-0.5 self-stretch rounded-full shrink-0 mt-0.5"
         style={{ backgroundColor: accentColor }}
       />
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
+        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
           <span className="text-sm font-medium truncate">{session.assignment.title}</span>
           {isAtRisk && (
-            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 shrink-0">
-              At Risk
-            </Badge>
+            <span className="text-[10px] font-mono font-medium text-red-400 bg-red-500/15 border border-red-500/30 px-1.5 py-0.5 rounded shrink-0">
+              at-risk
+            </span>
           )}
           {session.isPartial && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
-              Partial
-            </Badge>
+            <span className="text-[10px] font-mono text-muted-foreground bg-white/5 border border-white/10 px-1.5 py-0.5 rounded shrink-0">
+              partial
+            </span>
           )}
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
           <span className="mono-nums">
             {minutesToTime(session.blockStart)} · {formatDuration(session.duration)}
           </span>
           {session.assignment.subject && (
             <span
-              className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+              className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded"
               style={{ backgroundColor: accentColor + '22', color: accentColor }}
             >
               {session.assignment.subject}
@@ -94,35 +93,41 @@ export function SessionCard({
         </div>
 
         {isActiveTimer && (
-          <div className="mt-1 text-xs mono-nums text-green-600 font-medium">
-            ● {formatElapsed(elapsedSeconds)}
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs mono-nums text-primary font-medium">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            {formatElapsed(elapsedSeconds)}
           </div>
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Actions — always visible at low opacity, full on hover */}
+      <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
         <button
           onClick={() =>
             isActiveTimer
               ? onTimerStop()
               : onTimerStart(session.id, session.assignment.id)
           }
-          className="p-1.5 rounded-md hover:bg-muted transition-colors"
+          className={cn(
+            'p-1.5 rounded transition-colors',
+            isActiveTimer
+              ? 'text-red-400 hover:bg-red-500/15 hover:text-red-300'
+              : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
+          )}
           title={isActiveTimer ? 'Stop timer' : 'Start timer'}
         >
           {isActiveTimer ? (
-            <Square className="w-3.5 h-3.5 text-red-500" />
+            <Square className="w-3.5 h-3.5" />
           ) : (
             <Play className="w-3.5 h-3.5" />
           )}
         </button>
         <button
           onClick={() => onComplete(session.assignment.id)}
-          className="p-1.5 rounded-md hover:bg-muted transition-colors"
+          className="p-1.5 rounded text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
           title="Mark complete"
         >
-          <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+          <CheckCircle2 className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
