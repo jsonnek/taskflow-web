@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -17,7 +17,7 @@ function getFirstDay(year: number, month: number) {
   return new Date(year, month, 1).getDay()
 }
 function toDateStr(year: number, month: number, day: number) {
-  return `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 function formatDisplay(val: string) {
   if (!val) return ''
@@ -41,7 +41,9 @@ export function DateInput({
   value, onChange, min, max, id, className, placeholder = 'Pick a date…',
 }: DateInputProps) {
   const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const calendarRef = useRef<HTMLDivElement>(null)
 
   const today = new Date()
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate())
@@ -54,18 +56,43 @@ export function DateInput({
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false)
+      if (
+        !buttonRef.current?.contains(e.target as Node) &&
+        !calendarRef.current?.contains(e.target as Node)
+      ) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
+  // Reposition if window scrolls/resizes while open
+  const reposition = useCallback(() => {
+    if (!buttonRef.current) return
+    const rect = buttonRef.current.getBoundingClientRect()
+    // Flip above if not enough space below
+    const spaceBelow = window.innerHeight - rect.bottom
+    const calH = 280
+    const top = spaceBelow < calH ? rect.top - calH - 6 : rect.bottom + 6
+    setPos({ top, left: rect.left, width: rect.width })
+  }, [])
+
   function handleOpen() {
     const d = value ? new Date(value + 'T00:00:00') : today
     setViewYear(d.getFullYear())
     setViewMonth(d.getMonth())
+    reposition()
     setOpen(true)
   }
+
+  useEffect(() => {
+    if (!open) return
+    window.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
+    return () => {
+      window.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
+    }
+  }, [open, reposition])
 
   function prevMonth() {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
@@ -81,46 +108,35 @@ export function DateInput({
     setOpen(false)
   }
 
-  function goToday() {
-    onChange(todayStr)
-    setOpen(false)
-  }
-
-  // Build grid — always 6 rows × 7 cols = 42 cells
-  type Cell = { day: number; dateStr: string; cur: boolean; disabled: boolean }
+  // Build 6×7 grid
+  type Cell = { day: number; cur: boolean; disabled: boolean; dateStr: string }
   const cells: Cell[] = []
-
   const firstDay = getFirstDay(viewYear, viewMonth)
   const daysInCur = getDaysInMonth(viewYear, viewMonth)
   const prevM = viewMonth === 0 ? 11 : viewMonth - 1
   const prevY = viewMonth === 0 ? viewYear - 1 : viewYear
-  const daysInPrev = getDaysInMonth(prevY, prevM)
   const nextM = viewMonth === 11 ? 0 : viewMonth + 1
   const nextY = viewMonth === 11 ? viewYear + 1 : viewYear
 
-  // Prev month fill
   for (let i = firstDay - 1; i >= 0; i--) {
-    const day = daysInPrev - i
-    const ds = toDateStr(prevY, prevM, day)
-    cells.push({ day, dateStr: ds, cur: false, disabled: true })
+    const day = getDaysInMonth(prevY, prevM) - i
+    cells.push({ day, cur: false, disabled: true, dateStr: toDateStr(prevY, prevM, day) })
   }
-  // Current month
   for (let d = 1; d <= daysInCur; d++) {
     const ds = toDateStr(viewYear, viewMonth, d)
     const disabled = (!!min && ds < min) || (!!max && ds > max)
-    cells.push({ day: d, dateStr: ds, cur: true, disabled })
+    cells.push({ day: d, cur: true, disabled, dateStr: ds })
   }
-  // Next month fill
   while (cells.length < 42) {
     const day = cells.length - firstDay - daysInCur + 1
-    const ds = toDateStr(nextY, nextM, day)
-    cells.push({ day, dateStr: ds, cur: false, disabled: true })
+    cells.push({ day, cur: false, disabled: true, dateStr: toDateStr(nextY, nextM, day) })
   }
 
   return (
-    <div ref={containerRef} className={cn('relative', className)}>
-      {/* Trigger button */}
+    <div className={cn('relative', className)}>
+      {/* Trigger */}
       <button
+        ref={buttonRef}
         type="button"
         id={id}
         onClick={handleOpen}
@@ -132,32 +148,29 @@ export function DateInput({
         <Calendar className="w-3.5 h-3.5 text-primary shrink-0 ml-2" />
       </button>
 
-      {/* Custom calendar popover */}
+      {/* Calendar — rendered via fixed positioning to escape overflow:hidden parents */}
       {open && (
-        <div className="absolute z-50 mt-1.5 left-0 w-60 rounded-lg border border-border bg-card shadow-2xl shadow-black/60 p-3 select-none">
-
-          {/* Month/year nav */}
+        <div
+          ref={calendarRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, minWidth: 240, zIndex: 9999 }}
+          className="rounded-lg border border-border bg-card shadow-2xl shadow-black/70 p-3 select-none"
+        >
+          {/* Month nav */}
           <div className="flex items-center justify-between mb-2.5">
-            <button
-              type="button"
-              onClick={prevMonth}
-              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <button type="button" onClick={prevMonth}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
             <span className="text-xs font-mono font-semibold tracking-wide">
               {MONTHS[viewMonth]} {viewYear}
             </span>
-            <button
-              type="button"
-              onClick={nextMonth}
-              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <button type="button" onClick={nextMonth}
+              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* Day-of-week headers */}
+          {/* Day headers */}
           <div className="grid grid-cols-7 mb-1">
             {DAY_HEADERS.map((h, i) => (
               <div key={i} className="text-center text-[9px] font-mono text-muted-foreground/50 py-0.5 uppercase">
@@ -171,7 +184,6 @@ export function DateInput({
             {cells.map((cell, i) => {
               const isSelected = cell.cur && cell.dateStr === value
               const isToday = cell.cur && cell.dateStr === todayStr
-
               return (
                 <button
                   key={i}
@@ -199,18 +211,14 @@ export function DateInput({
 
           {/* Footer */}
           <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-border">
-            <button
-              type="button"
+            <button type="button"
               onClick={() => { onChange(''); setOpen(false) }}
-              className="text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors px-1"
-            >
+              className="text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors px-1">
               clear
             </button>
-            <button
-              type="button"
-              onClick={goToday}
-              className="text-[10px] font-mono text-primary hover:text-primary/70 transition-colors px-1"
-            >
+            <button type="button"
+              onClick={() => { onChange(todayStr); setOpen(false) }}
+              className="text-[10px] font-mono text-primary hover:text-primary/70 transition-colors px-1">
               today
             </button>
           </div>
