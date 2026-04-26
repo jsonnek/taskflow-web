@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useStore } from '@/hooks/use-store'
 import { useKeyboard } from '@/hooks/use-keyboard'
+import { DateInput } from '@/components/ui/date-input'
 
 export function QuickCapture() {
   const [open, setOpen] = useState(false)
@@ -82,13 +83,7 @@ export function QuickCapture() {
 
             <div className="space-y-1.5">
               <Label htmlFor="qc-due">Due date</Label>
-              <Input
-                id="qc-due"
-                type="date"
-                min={today}
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
+              <DateInput min={today} value={dueDate} onChange={setDueDate} />
             </div>
 
             <div className="space-y-1.5">

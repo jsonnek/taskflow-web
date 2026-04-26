@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
+import { DateInput } from '@/components/ui/date-input'
 import type { Assignment, Project } from '@/types'
 
 type SortKey = 'manual' | 'priority' | 'dueDate' | 'time'
@@ -460,7 +461,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div className="space-y-1.5">
               <Label>Due Date</Label>
-              <Input type="date" min={today} value={projDue} onChange={(e) => setProjDue(e.target.value)} />
+              <DateInput min={today} value={projDue} onChange={setProjDue} />
             </div>
             {groups.length > 0 && (
               <div className="space-y-1.5">

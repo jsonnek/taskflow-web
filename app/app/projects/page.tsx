@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
+import { DateInput } from '@/components/ui/date-input'
 import type { Project } from '@/types'
 
 function daysUntil(iso?: string): number | null {
@@ -186,7 +187,7 @@ export default function ProjectsPage() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="proj-due">Due Date</Label>
-              <Input id="proj-due" type="date" min={today} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              <DateInput min={today} value={dueDate} onChange={setDueDate} />
             </div>
             {groups.length > 0 && (
               <div className="space-y-1.5">

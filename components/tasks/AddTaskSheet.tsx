@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { DateInput } from '@/components/ui/date-input'
 import { useStore } from '@/hooks/use-store'
 import { predictionStore } from '@/lib/store'
 import type { Assignment, RecurrenceRule, Template } from '@/types'
@@ -203,7 +204,7 @@ export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId }:
               </div>
               <div className="space-y-1.5">
                 <SectionLabel>Due Date</SectionLabel>
-                <Input type="date" min={today} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-8 text-sm" />
+                <DateInput min={today} value={dueDate} onChange={setDueDate} />
               </div>
             </div>
 
@@ -358,7 +359,7 @@ export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId }:
                         )}
                         <div className="space-y-1">
                           <Label className="text-xs">End date (optional)</Label>
-                          <Input type="date" min={today} value={recEndDate} onChange={(e) => setRecEndDate(e.target.value)} className="h-7 text-xs" />
+                          <DateInput min={today} value={recEndDate} onChange={setRecEndDate} placeholder="No end date" />
                         </div>
                       </div>
                     )}
