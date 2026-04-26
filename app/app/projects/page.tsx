@@ -1,95 +1,65 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, FolderKanban, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, FolderKanban, Trash2, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
 import { useStore } from '@/hooks/use-store'
-import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import type { Project } from '@/types'
-
-function formatDate(iso?: string) {
-  if (!iso) return null
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 function daysUntil(iso?: string): number | null {
   if (!iso) return null
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  const due = new Date(iso)
-  due.setHours(0, 0, 0, 0)
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  const due = new Date(iso); due.setHours(0, 0, 0, 0)
   return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 export default function ProjectsPage() {
-  const {
-    projects,
-    assignments,
-    groups,
-    addProject,
-    updateProject,
-    deleteProject,
-    completeAssignment,
-  } = useStore()
+  const { projects, assignments, groups, addProject, updateProject, deleteProject } = useStore()
 
   const [createOpen, setCreateOpen] = useState(false)
   const [editProject, setEditProject] = useState<Project | undefined>()
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-
-  // Form state
   const [name, setName] = useState('')
   const [notes, setNotes] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [groupId, setGroupId] = useState('')
+  const today = new Date().toISOString().split('T')[0]
 
   function openCreate() {
-    setEditProject(undefined)
-    setName('')
-    setNotes('')
-    setDueDate('')
-    setGroupId('')
+    setEditProject(undefined); setName(''); setNotes(''); setDueDate(''); setGroupId('')
     setCreateOpen(true)
   }
-
-  function openEdit(p: Project) {
-    setEditProject(p)
-    setName(p.name)
-    setNotes(p.notes ?? '')
-    setDueDate(p.dueDate ? p.dueDate.split('T')[0] : '')
-    setGroupId(p.groupId ?? '')
+  function openEdit(e: React.MouseEvent, p: Project) {
+    e.preventDefault(); e.stopPropagation()
+    setEditProject(p); setName(p.name); setNotes(p.notes ?? '')
+    setDueDate(p.dueDate ? p.dueDate.split('T')[0] : ''); setGroupId(p.groupId ?? '')
     setCreateOpen(true)
   }
-
+  function handleDelete(e: React.MouseEvent, id: string) {
+    e.preventDefault(); e.stopPropagation()
+    deleteProject(id)
+  }
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
-    const data = {
-      name: name.trim(),
-      notes: notes || undefined,
-      dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
-      groupId: groupId || undefined,
-    }
-    if (editProject) {
-      updateProject({ ...editProject, ...data })
-    } else {
-      addProject(data)
-    }
+    const data = { name: name.trim(), notes: notes || undefined, dueDate: dueDate ? new Date(dueDate).toISOString() : undefined, groupId: groupId || undefined }
+    if (editProject) updateProject({ ...editProject, ...data })
+    else addProject(data)
     setCreateOpen(false)
   }
 
-  const today = new Date().toISOString().split('T')[0]
-
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8">
+    <div className="max-w-4xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground">{projects.length} projects</p>
+          <p className="text-sm text-muted-foreground font-mono">
+            {projects.length} project{projects.length !== 1 ? 's' : ''}
+          </p>
         </div>
         <Button size="sm" onClick={openCreate} className="gap-1.5">
           <Plus className="w-4 h-4" /> New Project
@@ -104,130 +74,97 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {projects.map((project) => {
           const projectTasks = assignments.filter((a) => a.projectId === project.id)
           const completed = projectTasks.filter((a) => a.isCompleted).length
           const total = projectTasks.length
-          const progress = total > 0 ? (completed / total) * 100 : 0
+          const pct = total > 0 ? Math.round((completed / total) * 100) : 0
           const isComplete = total > 0 && completed === total
           const days = daysUntil(project.dueDate)
-          const isExpanded = expandedId === project.id
           const group = groups.find((g) => g.id === project.groupId)
+          const overdue = days !== null && days < 0
 
           return (
-            <div key={project.id} className="rounded-lg border border-border bg-card overflow-hidden">
-              {/* Project header */}
-              <div className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-sm">{project.name}</span>
-                      {isComplete && (
-                        <Badge variant="secondary" className="text-[10px]">Complete</Badge>
-                      )}
-                      {group && (
-                        <span
-                          className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                          style={{ backgroundColor: group.colorHex + '22', color: group.colorHex }}
-                        >
-                          {group.name}
-                        </span>
-                      )}
-                    </div>
-
-                    {project.notes && (
-                      <p className="text-xs text-muted-foreground mb-2">{project.notes}</p>
-                    )}
-
-                    <div className="flex items-center gap-3 mb-2">
-                      <Progress value={progress} className="flex-1 h-1.5" />
-                      <span className="text-xs mono-nums text-muted-foreground shrink-0">
-                        {completed}/{total}
+            <Link
+              key={project.id}
+              href={`/app/projects/${project.id}`}
+              className="block rounded-lg border border-border bg-card p-4 hover:border-primary/40 hover:bg-card/80 transition-all group"
+            >
+              {/* Header row */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm">{project.name}</span>
+                    {isComplete && (
+                      <span className="text-[10px] font-mono font-medium text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                        complete
                       </span>
-                    </div>
-
-                    {project.dueDate && (
-                      <span className={`text-xs mono-nums ${days !== null && days < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                        Due {formatDate(project.dueDate)}
-                        {days !== null && days >= 0 && ` · ${days}d left`}
-                        {days !== null && days < 0 && ` · ${Math.abs(days)}d overdue`}
+                    )}
+                    {group && (
+                      <span
+                        className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: group.colorHex + '22', color: group.colorHex }}
+                      >
+                        {group.name}
                       </span>
                     )}
                   </div>
+                  {project.notes && (
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{project.notes}</p>
+                  )}
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary/60 transition-colors shrink-0 mt-0.5 ml-2" />
+              </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => openEdit(project)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => deleteProject(project.id)}
-                      className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setExpandedId(isExpanded ? null : project.id)}
-                      className="p-1.5 rounded-md hover:bg-muted transition-colors"
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
+              {/* Progress bar */}
+              <div className="mb-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {completed}/{total} tasks
+                  </span>
+                  <span className="text-[10px] font-mono text-muted-foreground">{pct}%</span>
+                </div>
+                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: isComplete ? 'oklch(0.75 0.16 160)' : 'oklch(0.82 0.12 207)',
+                    }}
+                  />
                 </div>
               </div>
 
-              {/* Task list */}
-              {isExpanded && (
-                <div className="border-t border-border">
-                  {projectTasks.length === 0 ? (
-                    <p className="text-xs text-muted-foreground px-4 py-3">No tasks in this project.</p>
-                  ) : (
-                    <div className="divide-y divide-border">
-                      {projectTasks
-                        .sort((a, b) => (a.projectOrder ?? 0) - (b.projectOrder ?? 0))
-                        .map((task) => {
-                          const tgroup = groups.find((g) => g.name === task.subject)
-                          const color = tgroup?.colorHex ?? '#6366F1'
-                          return (
-                            <div
-                              key={task.id}
-                              className="flex items-center gap-3 px-4 py-2.5"
-                            >
-                              <div
-                                className="w-1 h-4 rounded-full shrink-0"
-                                style={{ backgroundColor: color }}
-                              />
-                              <span
-                                className={`flex-1 text-sm ${task.isCompleted ? 'line-through text-muted-foreground' : ''}`}
-                              >
-                                {task.title}
-                              </span>
-                              <span className="text-xs mono-nums text-muted-foreground shrink-0">
-                                {task.estimatedMinutes}m
-                              </span>
-                              {!task.isCompleted && (
-                                <button
-                                  onClick={() => completeAssignment(task.id)}
-                                  className="text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                                >
-                                  Done
-                                </button>
-                              )}
-                            </div>
-                          )
-                        })}
-                    </div>
-                  )}
+              {/* Footer */}
+              <div className="flex items-center justify-between">
+                {project.dueDate ? (
+                  <span className={`text-[10px] font-mono ${overdue ? 'text-red-400' : 'text-muted-foreground'}`}>
+                    {overdue
+                      ? `${Math.abs(days!)}d overdue`
+                      : days === 0 ? 'due today'
+                      : `${days}d left`}
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono text-muted-foreground/40">no due date</span>
+                )}
+
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => openEdit(e, project)}
+                    className="text-[10px] font-mono text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded hover:bg-primary/10 transition-all"
+                  >
+                    edit
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(e, project.id)}
+                    className="text-[10px] font-mono text-muted-foreground hover:text-red-400 px-1.5 py-0.5 rounded hover:bg-red-500/10 transition-all"
+                  >
+                    delete
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            </Link>
           )
         })}
       </div>
@@ -236,51 +173,33 @@ export default function ProjectsPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editProject ? 'Edit Project' : 'New Project'}</DialogTitle>
+            <DialogTitle className="font-mono text-sm">{editProject ? 'edit project' : 'new project'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3 mt-2">
             <div className="space-y-1.5">
-              <Label htmlFor="proj-name">Name *</Label>
-              <Input
-                id="proj-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Project name"
-                autoFocus
-                required
-              />
+              <Label htmlFor="proj-name">Name</Label>
+              <Input id="proj-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Project name" autoFocus required />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="proj-notes">Notes</Label>
-              <Input
-                id="proj-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional notes"
-              />
+              <Input id="proj-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional description" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="proj-due">Due Date</Label>
-              <Input
-                id="proj-due"
-                type="date"
-                min={today}
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
+              <Input id="proj-due" type="date" min={today} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
             {groups.length > 0 && (
               <div className="space-y-1.5">
-                <Label>Group</Label>
+                <Label>Subject Group</Label>
                 <Select value={groupId} onValueChange={(v) => setGroupId(v ?? '')}>
                   <SelectTrigger>
-                    <SelectValue placeholder="No group" />
+                    <span className="text-sm">
+                      {groupId ? groups.find(g => g.id === groupId)?.name ?? 'No group' : <span className="text-muted-foreground">No group</span>}
+                    </span>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">No group</SelectItem>
-                    {groups.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                    ))}
+                    {groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -289,9 +208,7 @@ export default function ProjectsPage() {
               <Button type="submit" className="flex-1" disabled={!name.trim()}>
                 {editProject ? 'Save' : 'Create'}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-                Cancel
-              </Button>
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             </div>
           </form>
         </DialogContent>

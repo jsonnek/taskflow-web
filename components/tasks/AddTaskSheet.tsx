@@ -17,6 +17,7 @@ interface AddTaskSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   editTask?: Assignment
+  defaultProjectId?: string
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -50,7 +51,7 @@ function DotRating({ value, onChange, label }: { value: number; onChange: (v: nu
   )
 }
 
-export function AddTaskSheet({ open, onOpenChange, editTask }: AddTaskSheetProps) {
+export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId }: AddTaskSheetProps) {
   const { groups, projects, assignments, templates, addAssignment, updateAssignment, addTemplate } = useStore()
 
   const [title, setTitle] = useState(editTask?.title ?? '')
@@ -61,7 +62,7 @@ export function AddTaskSheet({ open, onOpenChange, editTask }: AddTaskSheetProps
   const [importance, setImportance] = useState(editTask?.importance ?? 3)
   const [isPriority, setIsPriority] = useState(editTask?.isPriority ?? false)
   const [isSplittable, setIsSplittable] = useState(editTask?.isSplittable ?? true)
-  const [projectId, setProjectId] = useState(editTask?.projectId ?? '')
+  const [projectId, setProjectId] = useState(editTask?.projectId ?? defaultProjectId ?? '')
   const [prerequisiteIds, setPrerequisiteIds] = useState<string[]>(editTask?.prerequisiteIds ?? [])
   const [saveAsTemplate, setSaveAsTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
