@@ -19,6 +19,7 @@ interface AddTaskSheetProps {
   onOpenChange: (open: boolean) => void
   editTask?: Assignment
   defaultProjectId?: string
+  defaultSubject?: string
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -52,11 +53,11 @@ function DotRating({ value, onChange, label }: { value: number; onChange: (v: nu
   )
 }
 
-export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId }: AddTaskSheetProps) {
+export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId, defaultSubject }: AddTaskSheetProps) {
   const { groups, projects, assignments, templates, addAssignment, updateAssignment, addTemplate } = useStore()
 
   const [title, setTitle] = useState(editTask?.title ?? '')
-  const [subject, setSubject] = useState(editTask?.subject ?? '')
+  const [subject, setSubject] = useState(editTask?.subject ?? defaultSubject ?? '')
   const [dueDate, setDueDate] = useState(editTask?.dueDate ? editTask.dueDate.split('T')[0] : '')
   const [estimatedMinutes, setEstimatedMinutes] = useState(editTask?.estimatedMinutes ?? 30)
   const [difficulty, setDifficulty] = useState(editTask?.difficulty ?? 3)

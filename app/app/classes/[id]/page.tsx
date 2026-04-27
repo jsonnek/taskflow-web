@@ -2,11 +2,12 @@
 
 import { useMemo, useState, use } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, FolderKanban, Circle, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, FolderKanban, Circle, Plus, Pencil, RotateCcw } from 'lucide-react'
 import { useStore } from '@/hooks/use-store'
 import { PgHeader } from '@/components/layout/PgHeader'
 import { Button } from '@/components/ui/button'
 import { TimePromptDialog } from '@/components/tasks/TimePromptDialog'
+import { AddTaskSheet } from '@/components/tasks/AddTaskSheet'
 import type { Assignment } from '@/types'
 
 function daysUntil(iso: string): number {
@@ -26,6 +27,8 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = use(params)
   const { assignments, groups, projects, completeAssignment, uncompleteAssignment, addTimeEntry } = useStore()
   const [pendingComplete, setPendingComplete] = useState<Assignment | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [editTask, setEditTask] = useState<Assignment | undefined>()
 
   const group = groups.find((g) => g.id === id)
   const groupAssignments = useMemo(
@@ -93,9 +96,17 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* Assignments */}
-      <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/50 mb-2.5">
-        // assignments
-      </p>
+      <div className="flex items-center justify-between mb-2.5">
+        <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/50">
+          // assignments
+        </p>
+        <button
+          onClick={() => { setEditTask(undefined); setAddOpen(true) }}
+          className="flex items-center gap-1 font-mono text-[10px] text-primary/70 hover:text-primary border border-primary/20 hover:border-primary/50 hover:bg-primary/10 px-2 py-0.5 rounded transition-all"
+        >
+          <Plus className="w-3 h-3" /> add task
+        </button>
+      </div>
       <div className="flex flex-col gap-1.5 mb-6">
         {pending.length === 0 && (
           <div className="font-mono text-[11px] text-muted-foreground/40 text-center px-4 py-3.5 rounded-md border border-dashed border-border">
@@ -113,7 +124,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
             return (
               <div
                 key={task.id}
-                className="flex items-center gap-2.5 bg-card rounded-lg px-3 py-2.5 border"
+                className="flex items-center gap-2.5 bg-card rounded-lg px-3 py-2.5 border group/row transition-all"
                 style={{ borderColor: overdue ? 'oklch(0.65 0.22 25/40%)' : 'var(--border)' }}
               >
                 <button
@@ -149,14 +160,51 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
                     </span>
                   </div>
                 </div>
+                <button
+                  onClick={() => { setEditTask(task); setAddOpen(true) }}
+                  className="opacity-0 group-hover/row:opacity-100 transition-opacity font-mono text-[10px] text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-0.5 rounded shrink-0"
+                >
+                  edit
+                </button>
               </div>
             )
           })}
 
         {done.length > 0 && (
-          <p className="font-mono text-[10px] text-muted-foreground/40 py-1.5 px-1">
-            {done.length} completed
-          </p>
+          <details className="group/done">
+            <summary className="font-mono text-[10px] text-muted-foreground/40 py-1.5 px-1 cursor-pointer list-none flex items-center gap-1 hover:text-muted-foreground/70 transition-colors">
+              <span className="inline-block transition-transform group-open/done:rotate-90">▶</span>
+              {done.length} completed
+            </summary>
+            <div className="flex flex-col gap-1 mt-1">
+              {done.map((task) => (
+                <div
+                  key={task.id}
+                  className="flex items-center gap-2.5 bg-card/50 rounded-lg px-3 py-2 border border-border/50 group/done-row"
+                >
+                  <button
+                    onClick={() => uncompleteAssignment(task.id)}
+                    className="shrink-0 flex text-primary/60 hover:text-muted-foreground transition-colors"
+                    title="Restore"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                  <div
+                    className="w-0.5 self-stretch min-h-5 rounded-full shrink-0 opacity-40"
+                    style={{ background: group.colorHex }}
+                  />
+                  <span className="text-[12px] text-muted-foreground/60 line-through flex-1 truncate">
+                    {task.title}
+                  </span>
+                  {task.completedAt && (
+                    <span className="font-mono text-[9px] text-muted-foreground/40 shrink-0">
+                      {new Date(task.completedAt).toLocaleDateString('en', { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </details>
         )}
       </div>
 
@@ -199,6 +247,15 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
           })}
         </div>
       )}
+
+      {/* Add / edit task sheet */}
+      <AddTaskSheet
+        key={editTask?.id ?? 'new'}
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        editTask={editTask}
+        defaultSubject={group.name}
+      />
 
       {/* Time prompt */}
       {pendingComplete && (
