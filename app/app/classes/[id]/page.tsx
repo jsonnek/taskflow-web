@@ -8,7 +8,8 @@ import { PgHeader } from '@/components/layout/PgHeader'
 import { Button } from '@/components/ui/button'
 import { TimePromptDialog } from '@/components/tasks/TimePromptDialog'
 import { AddTaskSheet } from '@/components/tasks/AddTaskSheet'
-import type { Assignment } from '@/types'
+import { ProjectDialog } from '@/components/projects/ProjectDialog'
+import type { Assignment, Project } from '@/types'
 
 function daysUntil(iso: string): number {
   const now = new Date(); now.setHours(0, 0, 0, 0)
@@ -29,6 +30,8 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
   const [pendingComplete, setPendingComplete] = useState<Assignment | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [editTask, setEditTask] = useState<Assignment | undefined>()
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false)
+  const [editProject, setEditProject] = useState<Project | undefined>()
 
   const group = groups.find((g) => g.id === id)
   const groupAssignments = useMemo(
@@ -209,9 +212,17 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* Projects */}
-      <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/50 mb-2.5">
-        // projects
-      </p>
+      <div className="flex items-center justify-between mb-2.5">
+        <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/50">
+          // projects
+        </p>
+        <button
+          onClick={() => { setEditProject(undefined); setProjectDialogOpen(true) }}
+          className="flex items-center gap-1 font-mono text-[10px] text-primary/70 hover:text-primary border border-primary/20 hover:border-primary/50 hover:bg-primary/10 px-2 py-0.5 rounded transition-all"
+        >
+          <Plus className="w-3 h-3" /> new project
+        </button>
+      </div>
       {groupProjects.length === 0 ? (
         <div className="font-mono text-[11px] text-muted-foreground/40 text-center px-4 py-3.5 rounded-md border border-dashed border-border">
           no projects
@@ -223,30 +234,47 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
             const projDone = projTasks.filter((a) => a.isCompleted).length
             const projPct = projTasks.length ? Math.round((projDone / projTasks.length) * 100) : 0
             return (
-              <Link
-                key={proj.id}
-                href={`/app/projects/${proj.id}`}
-                className="bg-card rounded-lg px-3.5 py-3 border transition-all hover:border-primary/30"
-                style={{ borderColor: group.colorHex + '40', boxShadow: `0 0 16px ${group.colorHex}08` }}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <FolderKanban className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-                  <span className="text-[13px] font-medium flex-1">{proj.name}</span>
-                  <span className="font-mono text-[10px] text-muted-foreground/50">
-                    {projDone}/{projTasks.length} · {projPct}%
-                  </span>
+              <div key={proj.id} className="group/proj bg-card rounded-lg border transition-all" style={{ borderColor: group.colorHex + '40' }}>
+                <Link
+                  href={`/app/projects/${proj.id}`}
+                  className="block px-3.5 pt-3 pb-2"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <FolderKanban className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                    <span className="text-[13px] font-medium flex-1">{proj.name}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground/50">
+                      {projDone}/{projTasks.length} · {projPct}%
+                    </span>
+                  </div>
+                  <div className="h-0.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${projPct}%`, background: group.colorHex, boxShadow: `0 0 5px ${group.colorHex}70` }}
+                    />
+                  </div>
+                </Link>
+                <div className="flex justify-end px-3.5 pb-2 opacity-0 group-hover/proj:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => { setEditProject(proj); setProjectDialogOpen(true) }}
+                    className="font-mono text-[9px] text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-0.5 rounded transition-all"
+                  >
+                    edit
+                  </button>
                 </div>
-                <div className="h-0.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${projPct}%`, background: group.colorHex, boxShadow: `0 0 5px ${group.colorHex}70` }}
-                  />
-                </div>
-              </Link>
+              </div>
             )
           })}
         </div>
       )}
+
+      {/* Add / edit project dialog */}
+      <ProjectDialog
+        key={editProject?.id ?? 'new-proj'}
+        open={projectDialogOpen}
+        onOpenChange={setProjectDialogOpen}
+        editProject={editProject}
+        defaultGroupId={id}
+      />
 
       {/* Add / edit task sheet */}
       <AddTaskSheet

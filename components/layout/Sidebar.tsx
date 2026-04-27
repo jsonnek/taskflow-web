@@ -142,11 +142,12 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 px-1.5 py-2 flex flex-col gap-px overflow-y-auto">
         {/* Main nav */}
-        <NavItem href="/app/home"      label="home"       icon={Home}        active={isActive('/app/home')} />
-        <NavItem href="/app/timeline"  label="timeline"   icon={CalendarDays} active={isActive('/app/timeline')} />
-        <NavItem href="/app/tasks"     label="tasks"      icon={CheckSquare}  active={isActive('/app/tasks')} badge={atRisk || undefined} />
-        <NavItem href="/app/classes"   label="classes"    icon={BookOpen}     active={isActive('/app/classes')} />
-        <NavItem href="/app/stats"     label="stats"      icon={BarChart3}    active={isActive('/app/stats')} />
+        <NavItem href="/app/home"      label="home"        icon={Home}         active={isActive('/app/home')} />
+        <NavItem href="/app/timeline"  label="timeline"    icon={CalendarDays} active={isActive('/app/timeline')} />
+        <NavItem href="/app/tasks"     label="tasks"       icon={CheckSquare}  active={isActive('/app/tasks')} badge={atRisk || undefined} />
+        <NavItem href="/app/classes"   label="classes"     icon={BookOpen}     active={isActive('/app/classes')} />
+        <NavItem href="/app/projects"  label="projects"    icon={FolderKanban} active={isActive('/app/projects')} />
+        <NavItem href="/app/stats"     label="stats"       icon={BarChart3}    active={isActive('/app/stats')} />
 
         {/* Classes section */}
         <SecLabel label="// classes" />

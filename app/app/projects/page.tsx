@@ -1,15 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, FolderKanban, Trash2, ArrowRight } from 'lucide-react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { Plus, FolderKanban, ArrowRight, Trash2 } from 'lucide-react'
 import { useStore } from '@/hooks/use-store'
+import { PgHeader } from '@/components/layout/PgHeader'
+import { ProjectDialog } from '@/components/projects/ProjectDialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
-import { DateInput } from '@/components/ui/date-input'
 import type { Project } from '@/types'
 
 function daysUntil(iso?: string): number | null {
@@ -20,200 +17,212 @@ function daysUntil(iso?: string): number | null {
 }
 
 export default function ProjectsPage() {
-  const { projects, assignments, groups, addProject, updateProject, deleteProject } = useStore()
+  const { projects, assignments, groups, deleteProject } = useStore()
 
-  const [createOpen, setCreateOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
   const [editProject, setEditProject] = useState<Project | undefined>()
-  const [name, setName] = useState('')
-  const [notes, setNotes] = useState('')
-  const [dueDate, setDueDate] = useState('')
-  const [groupId, setGroupId] = useState('')
-  const today = new Date().toISOString().split('T')[0]
 
   function openCreate() {
-    setEditProject(undefined); setName(''); setNotes(''); setDueDate(''); setGroupId('')
-    setCreateOpen(true)
+    setEditProject(undefined)
+    setDialogOpen(true)
   }
   function openEdit(e: React.MouseEvent, p: Project) {
     e.preventDefault(); e.stopPropagation()
-    setEditProject(p); setName(p.name); setNotes(p.notes ?? '')
-    setDueDate(p.dueDate ? p.dueDate.split('T')[0] : ''); setGroupId(p.groupId ?? '')
-    setCreateOpen(true)
+    setEditProject(p)
+    setDialogOpen(true)
   }
   function handleDelete(e: React.MouseEvent, id: string) {
     e.preventDefault(); e.stopPropagation()
     deleteProject(id)
   }
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!name.trim()) return
-    const data = { name: name.trim(), notes: notes || undefined, dueDate: dueDate ? new Date(dueDate).toISOString() : undefined, groupId: groupId || undefined }
-    if (editProject) updateProject({ ...editProject, ...data })
-    else addProject(data)
-    setCreateOpen(false)
+
+  // Group projects by class
+  const grouped = useMemo(() => {
+    const withGroup = groups.map((g) => ({
+      group: g,
+      projects: projects.filter((p) => p.groupId === g.id),
+    })).filter((g) => g.projects.length > 0)
+
+    const ungrouped = projects.filter((p) => !p.groupId)
+    return { withGroup, ungrouped }
+  }, [projects, groups])
+
+  const totalComplete = useMemo(() => {
+    return projects.filter((p) => {
+      const tasks = assignments.filter((a) => a.projectId === p.id)
+      return tasks.length > 0 && tasks.every((a) => a.isCompleted)
+    }).length
+  }, [projects, assignments])
+
+  function ProjectCard({ project }: { project: Project }) {
+    const tasks = assignments.filter((a) => a.projectId === project.id)
+    const completed = tasks.filter((a) => a.isCompleted).length
+    const total = tasks.length
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0
+    const isComplete = total > 0 && completed === total
+    const days = daysUntil(project.dueDate)
+    const overdue = days !== null && days < 0
+    const group = groups.find((g) => g.id === project.groupId)
+
+    return (
+      <Link
+        href={`/app/projects/${project.id}`}
+        className="flex flex-col bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-all group/card"
+        style={group ? { borderColor: group.colorHex + '30' } : {}}
+        onMouseEnter={(e) => {
+          if (group) (e.currentTarget as HTMLElement).style.borderColor = group.colorHex + '60'
+        }}
+        onMouseLeave={(e) => {
+          if (group) (e.currentTarget as HTMLElement).style.borderColor = group.colorHex + '30'
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              {group && (
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: group.colorHex, boxShadow: `0 0 5px ${group.colorHex}80` }}
+                />
+              )}
+              <span className="font-medium text-sm">{project.name}</span>
+              {isComplete && (
+                <span className="text-[9px] font-mono font-medium text-primary bg-primary/10 border border-primary/20 px-1.5 py-px rounded">
+                  complete
+                </span>
+              )}
+            </div>
+            {project.notes && (
+              <p className="text-xs text-muted-foreground truncate">{project.notes}</p>
+            )}
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/30 group-hover/card:text-primary/60 transition-colors shrink-0 mt-0.5 ml-2" />
+        </div>
+
+        {/* Progress */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-mono text-[9px] text-muted-foreground/60">{completed}/{total} tasks</span>
+            <span className="font-mono text-[9px] text-muted-foreground/60">{pct}%</span>
+          </div>
+          <div className="h-1 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${pct}%`,
+                background: isComplete
+                  ? 'oklch(0.72 0.18 155)'
+                  : group?.colorHex ?? 'oklch(0.82 0.12 207)',
+                boxShadow: pct > 0 ? `0 0 5px ${group?.colorHex ?? 'oklch(0.82 0.12 207)'}60` : 'none',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between mt-auto">
+          {project.dueDate ? (
+            <span className={`font-mono text-[9px] ${overdue ? 'text-red-400' : 'text-muted-foreground/50'}`}>
+              {overdue
+                ? `${Math.abs(days!)}d overdue`
+                : days === 0 ? 'due today'
+                : `${days}d left`}
+            </span>
+          ) : (
+            <span className="font-mono text-[9px] text-muted-foreground/30">no due date</span>
+          )}
+
+          <div className="flex items-center gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+            <button
+              onClick={(e) => openEdit(e, project)}
+              className="font-mono text-[9px] text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded hover:bg-primary/10 transition-all"
+            >
+              edit
+            </button>
+            <button
+              onClick={(e) => handleDelete(e, project.id)}
+              className="font-mono text-[9px] text-muted-foreground hover:text-red-400 px-1.5 py-0.5 rounded hover:bg-red-500/10 transition-all"
+            >
+              delete
+            </button>
+          </div>
+        </div>
+      </Link>
+    )
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground font-mono">
-            {projects.length} project{projects.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <Button size="sm" onClick={openCreate} className="gap-1.5">
-          <Plus className="w-4 h-4" /> New Project
-        </Button>
-      </div>
+    <div className="max-w-4xl mx-auto px-6 py-8 page-enter">
+      <PgHeader
+        title="projects"
+        sub={`${projects.length} project${projects.length !== 1 ? 's' : ''} · ${totalComplete} complete`}
+        stats={[
+          { v: projects.length, l: 'total' },
+          { v: totalComplete, l: 'done' },
+        ]}
+        action={
+          <Button size="sm" onClick={openCreate} className="gap-1.5">
+            <Plus className="w-4 h-4" /> New Project
+          </Button>
+        }
+      />
 
       {projects.length === 0 && (
         <div className="text-center py-16 border border-dashed border-border rounded-lg">
-          <FolderKanban className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+          <FolderKanban className="w-8 h-8 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm font-medium mb-1">No projects yet</p>
-          <p className="text-xs text-muted-foreground">Create a project to group related tasks together.</p>
+          <p className="text-xs text-muted-foreground mb-4">
+            Create a project to group related tasks together.
+          </p>
+          <Button size="sm" onClick={openCreate} className="gap-1.5">
+            <Plus className="w-4 h-4" /> New Project
+          </Button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {projects.map((project) => {
-          const projectTasks = assignments.filter((a) => a.projectId === project.id)
-          const completed = projectTasks.filter((a) => a.isCompleted).length
-          const total = projectTasks.length
-          const pct = total > 0 ? Math.round((completed / total) * 100) : 0
-          const isComplete = total > 0 && completed === total
-          const days = daysUntil(project.dueDate)
-          const group = groups.find((g) => g.id === project.groupId)
-          const overdue = days !== null && days < 0
+      {/* Grouped by class */}
+      {grouped.withGroup.map(({ group, projects: groupProjects }) => (
+        <div key={group.id} className="mb-8">
+          <div className="flex items-center gap-2 mb-3">
+            <span
+              className="w-2.5 h-2.5 rounded-full shrink-0"
+              style={{ background: group.colorHex, boxShadow: `0 0 6px ${group.colorHex}90` }}
+            />
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              {group.name}
+            </span>
+            <div className="flex-1 h-px bg-border ml-1" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {groupProjects.map((p) => <ProjectCard key={p.id} project={p} />)}
+          </div>
+        </div>
+      ))}
 
-          return (
-            <Link
-              key={project.id}
-              href={`/app/projects/${project.id}`}
-              className="block rounded-lg border border-border bg-card p-4 hover:border-primary/40 hover:bg-card/80 transition-all group"
-            >
-              {/* Header row */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm">{project.name}</span>
-                    {isComplete && (
-                      <span className="text-[10px] font-mono font-medium text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                        complete
-                      </span>
-                    )}
-                    {group && (
-                      <span
-                        className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded"
-                        style={{ backgroundColor: group.colorHex + '22', color: group.colorHex }}
-                      >
-                        {group.name}
-                      </span>
-                    )}
-                  </div>
-                  {project.notes && (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{project.notes}</p>
-                  )}
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary/60 transition-colors shrink-0 mt-0.5 ml-2" />
-              </div>
-
-              {/* Progress bar */}
-              <div className="mb-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-mono text-muted-foreground">
-                    {completed}/{total} tasks
-                  </span>
-                  <span className="text-[10px] font-mono text-muted-foreground">{pct}%</span>
-                </div>
-                <div className="h-1 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${pct}%`,
-                      backgroundColor: isComplete ? 'oklch(0.75 0.16 160)' : 'oklch(0.82 0.12 207)',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-between">
-                {project.dueDate ? (
-                  <span className={`text-[10px] font-mono ${overdue ? 'text-red-400' : 'text-muted-foreground'}`}>
-                    {overdue
-                      ? `${Math.abs(days!)}d overdue`
-                      : days === 0 ? 'due today'
-                      : `${days}d left`}
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-mono text-muted-foreground/40">no due date</span>
-                )}
-
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => openEdit(e, project)}
-                    className="text-[10px] font-mono text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded hover:bg-primary/10 transition-all"
-                  >
-                    edit
-                  </button>
-                  <button
-                    onClick={(e) => handleDelete(e, project.id)}
-                    className="text-[10px] font-mono text-muted-foreground hover:text-red-400 px-1.5 py-0.5 rounded hover:bg-red-500/10 transition-all"
-                  >
-                    delete
-                  </button>
-                </div>
-              </div>
-            </Link>
-          )
-        })}
-      </div>
-
-      {/* Create/edit dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-mono text-sm">{editProject ? 'edit project' : 'new project'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-3 mt-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="proj-name">Name</Label>
-              <Input id="proj-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Project name" autoFocus required />
+      {/* Ungrouped */}
+      {grouped.ungrouped.length > 0 && (
+        <div className="mb-8">
+          {grouped.withGroup.length > 0 && (
+            <div className="flex items-center gap-2 mb-3">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/40">
+                ungrouped
+              </span>
+              <div className="flex-1 h-px bg-border ml-1" />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="proj-notes">Notes</Label>
-              <Input id="proj-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional description" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="proj-due">Due Date</Label>
-              <DateInput min={today} value={dueDate} onChange={setDueDate} />
-            </div>
-            {groups.length > 0 && (
-              <div className="space-y-1.5">
-                <Label>Subject Group</Label>
-                <Select value={groupId} onValueChange={(v) => setGroupId(v ?? '')}>
-                  <SelectTrigger>
-                    <span className="text-sm">
-                      {groupId ? groups.find(g => g.id === groupId)?.name ?? 'No group' : <span className="text-muted-foreground">No group</span>}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">No group</SelectItem>
-                    {groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="flex gap-2 pt-1">
-              <Button type="submit" className="flex-1" disabled={!name.trim()}>
-                {editProject ? 'Save' : 'Create'}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {grouped.ungrouped.map((p) => <ProjectCard key={p.id} project={p} />)}
+          </div>
+        </div>
+      )}
+
+      <ProjectDialog
+        key={editProject?.id ?? 'new'}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        editProject={editProject}
+      />
     </div>
   )
 }
