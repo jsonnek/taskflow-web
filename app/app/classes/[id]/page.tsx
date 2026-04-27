@@ -206,14 +206,14 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
           open={!!pendingComplete}
           taskTitle={pendingComplete.title}
           estimatedMinutes={pendingComplete.estimatedMinutes}
-          onSave={(minutes) => {
-            const now = new Date()
+          onSave={(minutes, completedAt) => {
+            const endedAt = new Date(completedAt)
             addTimeEntry({
               assignmentId: pendingComplete.id,
-              startedAt: new Date(now.getTime() - minutes * 60000).toISOString(),
-              endedAt: now.toISOString(),
+              startedAt: new Date(endedAt.getTime() - minutes * 60000).toISOString(),
+              endedAt: endedAt.toISOString(),
             })
-            completeAssignment(pendingComplete.id)
+            completeAssignment(pendingComplete.id, completedAt)
             setPendingComplete(null)
           }}
           onSkip={() => {

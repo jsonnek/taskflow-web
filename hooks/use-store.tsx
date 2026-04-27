@@ -38,7 +38,7 @@ interface StoreActions {
   addAssignment: (a: Omit<Assignment, 'id' | 'createdAt'>) => Assignment
   updateAssignment: (a: Assignment) => void
   deleteAssignment: (id: string) => void
-  completeAssignment: (id: string) => void
+  completeAssignment: (id: string, completedAt?: string) => void
   uncompleteAssignment: (id: string) => void
   // Projects
   addProject: (p: Omit<Project, 'id' | 'createdAt'>) => Project
@@ -113,13 +113,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, assignments: assignmentStore.getAll() }))
   }, [])
 
-  const completeAssignment = useCallback((id: string) => {
+  const completeAssignment = useCallback((id: string, completedAt?: string) => {
     const all = assignmentStore.getAll()
     const a = all.find((x) => x.id === id)
     if (!a) return
 
-    const completedAt = new Date().toISOString()
-    const updated = { ...a, isCompleted: true, completedAt }
+    const resolvedCompletedAt = completedAt ?? new Date().toISOString()
+    const updated = { ...a, isCompleted: true, completedAt: resolvedCompletedAt }
     assignmentStore.upsert(updated)
 
     // Update prediction factor

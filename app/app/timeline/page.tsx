@@ -42,10 +42,10 @@ export default function TimelinePage() {
     setPendingComplete(a)
   }, [assignments])
 
-  function finishComplete(actualMinutes?: number) {
+  function finishComplete(actualMinutes: number, completedAt: string) {
     if (!pendingComplete) return
-    if (actualMinutes && actualMinutes > 0) {
-      const endedAt = new Date()
+    if (actualMinutes > 0) {
+      const endedAt = new Date(completedAt)
       const startedAt = new Date(endedAt.getTime() - actualMinutes * 60000)
       addTimeEntry({
         assignmentId: pendingComplete.id,
@@ -53,7 +53,7 @@ export default function TimelinePage() {
         endedAt: endedAt.toISOString(),
       })
     }
-    completeAssignment(pendingComplete.id)
+    completeAssignment(pendingComplete.id, completedAt)
     setPendingComplete(null)
   }
 
@@ -205,8 +205,8 @@ export default function TimelinePage() {
           open={!!pendingComplete}
           taskTitle={pendingComplete.title}
           estimatedMinutes={pendingComplete.estimatedMinutes}
-          onSave={(mins) => finishComplete(mins)}
-          onSkip={() => finishComplete()}
+          onSave={(mins, completedAt) => finishComplete(mins, completedAt)}
+          onSkip={() => { completeAssignment(pendingComplete!.id); setPendingComplete(null) }}
         />
       )}
     </div>
