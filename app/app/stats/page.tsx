@@ -97,18 +97,22 @@ function BarChart({
 
 // SVG donut ring
 function Donut({
-  segments, size = 100, thickness = 13,
+  segments, size = 100, thickness = 13, centerLabel,
 }: {
   segments: { value: number; color: string; label: string }[]
   size?: number
   thickness?: number
+  centerLabel?: string
 }) {
   const r = (size - thickness) / 2
   const circ = 2 * Math.PI * r
   const total = segments.reduce((s, sg) => s + sg.value, 0) || 1
-  // largest segment label
   const main = segments.reduce((a, b) => (a.value > b.value ? a : b))
   const mainPct = Math.round((main.value / total) * 100)
+  const label = centerLabel ?? `${mainPct}%`
+
+  // Detect if label has two parts (e.g. "12h\n30m")
+  const lines = label.split('\n')
 
   let offset = circ * 0.25 // start at top
   return (
@@ -142,17 +146,44 @@ function Donut({
         strokeDashoffset={circ * 0.25}
         style={{ filter: 'blur(5px)', opacity: 0.3 }}
       />
-      <text
-        x={size/2} y={size/2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontFamily="'Geist Mono', ui-monospace, monospace"
-        fontSize="14"
-        fontWeight="700"
-        fill="oklch(0.88 0.005 220)"
-      >
-        {mainPct}%
-      </text>
+      {lines.length === 1 ? (
+        <text
+          x={size/2} y={size/2}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontFamily="'Geist Mono', ui-monospace, monospace"
+          fontSize="13"
+          fontWeight="700"
+          fill="oklch(0.88 0.005 220)"
+        >
+          {lines[0]}
+        </text>
+      ) : (
+        <>
+          <text
+            x={size/2} y={size/2 - 7}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontFamily="'Geist Mono', ui-monospace, monospace"
+            fontSize="13"
+            fontWeight="700"
+            fill="oklch(0.88 0.005 220)"
+          >
+            {lines[0]}
+          </text>
+          <text
+            x={size/2} y={size/2 + 9}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontFamily="'Geist Mono', ui-monospace, monospace"
+            fontSize="10"
+            fontWeight="600"
+            fill="oklch(0.60 0.005 220)"
+          >
+            {lines[1]}
+          </text>
+        </>
+      )}
     </svg>
   )
 }
@@ -175,17 +206,20 @@ export default function StatsPage() {
   const lateCnt    = rate.completed - rate.onTimeCount
   const remaining  = rate.total - rate.completed
 
-  // Group workload donut — tasks per group as % of total incomplete
+  // Group workload donut — weighted by estimated minutes, not task count
   const groupWorkload = useMemo(() => {
     const incomplete = assignments.filter((a) => !a.isCompleted)
-    return groups.map((g) => ({
-      label: g.name,
-      color: g.colorHex,
-      value: incomplete.filter((a) => a.subject === g.name || a.groupId === g.id).length,
-    })).filter((g) => g.value > 0)
+    return groups.map((g) => {
+      const tasks = incomplete.filter((a) => a.subject === g.name || a.groupId === g.id)
+      const minutes = tasks.reduce((s, a) => s + a.estimatedMinutes, 0)
+      return { label: g.name, color: g.colorHex, value: minutes, taskCount: tasks.length }
+    }).filter((g) => g.value > 0)
   }, [assignments, groups])
 
-  const groupTotal = groupWorkload.reduce((s, g) => s + g.value, 0) || 1
+  const groupTotalMins = groupWorkload.reduce((s, g) => s + g.value, 0) || 1
+  const groupTotalHrs = groupTotalMins >= 60
+    ? `${Math.floor(groupTotalMins / 60)}h ${groupTotalMins % 60}m`
+    : `${groupTotalMins}m`
 
   // Heatmap grid: hours 8-17, days Mon-Sun
   const HOURS    = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
@@ -353,18 +387,36 @@ export default function StatsPage() {
         {groupWorkload.length > 0 && (
           <ChartCard title="Workload by Class">
             <div className="flex items-center gap-6">
-              <Donut segments={groupWorkload} size={108} thickness={14} />
-              <div className="flex flex-col gap-2.5 flex-1 min-w-0">
-                {groupWorkload.map((g) => {
-                  const pct = Math.round((g.value / groupTotal) * 100)
-                  return (
-                    <div key={g.label} className="flex items-center gap-2 min-w-0">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: g.color }} />
-                      <span className="text-xs text-muted-foreground flex-1 truncate">{g.label}</span>
-                      <span className="font-mono text-xs font-bold text-foreground shrink-0">{pct}%</span>
-                    </div>
-                  )
-                })}
+              <Donut
+                segments={groupWorkload}
+                size={108}
+                thickness={14}
+                centerLabel={groupTotalMins >= 60
+                  ? `${Math.floor(groupTotalMins / 60)}h\n${groupTotalMins % 60}m`
+                  : `${groupTotalMins}m`
+                }
+              />
+              <div className="flex flex-col gap-2 flex-1 min-w-0">
+                <p className="font-mono text-[9px] text-muted-foreground/40 uppercase tracking-widest mb-0.5">
+                  {groupTotalHrs} pending
+                </p>
+                {groupWorkload
+                  .slice()
+                  .sort((a, b) => b.value - a.value)
+                  .map((g) => {
+                    const pct = Math.round((g.value / groupTotalMins) * 100)
+                    const hrs = g.value >= 60
+                      ? `${Math.floor(g.value / 60)}h ${g.value % 60}m`
+                      : `${g.value}m`
+                    return (
+                      <div key={g.label} className="flex items-center gap-2 min-w-0">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: g.color }} />
+                        <span className="text-xs text-muted-foreground flex-1 truncate">{g.label}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground/60 shrink-0">{hrs}</span>
+                        <span className="font-mono text-xs font-bold text-foreground shrink-0 w-8 text-right">{pct}%</span>
+                      </div>
+                    )
+                  })}
               </div>
             </div>
           </ChartCard>
