@@ -39,6 +39,16 @@ export default function HomePage() {
   const onTimeRate = rateData.total > 0 ? Math.round(rateData.onTimeRate * 100) : 0
   const pending = assignments.filter((a) => !a.isCompleted).length
 
+  // Time logged today
+  const loggedTodayMins = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0]
+    return Math.round(
+      timeEntries
+        .filter((e) => e.endedAt && e.endedAt.startsWith(todayStr))
+        .reduce((s, e) => s + (new Date(e.endedAt!).getTime() - new Date(e.startedAt).getTime()) / 60000, 0)
+    )
+  }, [timeEntries])
+
   // Urgent tasks (due today or overdue or due tomorrow and priority)
   const urgent = useMemo(
     () =>
@@ -66,11 +76,16 @@ export default function HomePage() {
   // Chart data
   const chartMax = Math.max(...completions.map((c) => c.count), 1)
 
+  const loggedTodayLabel = loggedTodayMins >= 60
+    ? `${Math.floor(loggedTodayMins / 60)}h ${loggedTodayMins % 60}m`
+    : `${loggedTodayMins}m`
+
   const statCards = [
-    { l: 'Streak',   v: `${streakData.currentStreak}d`, sub: `Best: ${streakData.longestStreak}d`,       c: 'oklch(0.82 0.12 207)' },
-    { l: 'On-Time',  v: `${onTimeRate}%`,                sub: `${rateData.onTimeCount} / ${rateData.total} tasks`, c: 'oklch(0.72 0.18 155)' },
-    { l: 'Momentum', v: `${momentumScore}`,              sub: '0–100 composite',                          c: 'oklch(0.72 0.14 255)' },
-    { l: 'Workload', v: `${Math.round(gaugeData.utilizationRatio * 100)}%`, sub: 'of capacity used', c: 'oklch(0.80 0.18 65)' },
+    { l: 'Streak',      v: `${streakData.currentStreak}d`, sub: `Best: ${streakData.longestStreak}d`,       c: 'oklch(0.82 0.12 207)' },
+    { l: 'On-Time',     v: `${onTimeRate}%`,                sub: `${rateData.onTimeCount} / ${rateData.total} tasks`, c: 'oklch(0.72 0.18 155)' },
+    { l: 'Momentum',    v: `${momentumScore}`,              sub: '0–100 composite',                          c: 'oklch(0.72 0.14 255)' },
+    { l: 'Workload',    v: `${Math.round(gaugeData.utilizationRatio * 100)}%`, sub: 'of capacity used',  c: 'oklch(0.80 0.18 65)' },
+    { l: 'Logged Today',v: loggedTodayLabel,                sub: 'time tracked today',                       c: 'oklch(0.75 0.18 330)' },
   ]
 
   return (
@@ -82,11 +97,12 @@ export default function HomePage() {
           { v: `${streakData.currentStreak}d`, l: 'streak' },
           { v: `${onTimeRate}%`, l: 'on-time' },
           { v: pending, l: 'pending' },
+          { v: loggedTodayLabel, l: 'logged today' },
         ]}
       />
 
       {/* Stat cards */}
-      <div className="grid grid-cols-4 gap-2.5 mb-5">
+      <div className="grid grid-cols-5 gap-2.5 mb-5">
         {statCards.map((s) => (
           <div key={s.l} className="bg-card border border-border rounded-lg p-3 transition-colors">
             <p className="font-mono text-[9px] text-muted-foreground/60 uppercase tracking-widest mb-1.5">{s.l}</p>

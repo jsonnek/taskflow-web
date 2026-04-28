@@ -1,6 +1,6 @@
 'use client'
 
-import { Clock, Play, Square, CheckCircle2 } from 'lucide-react'
+import { Clock, Play, Square, CheckCircle2, Timer } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScheduledSession, TaskGroup } from '@/types'
 
@@ -8,6 +8,7 @@ interface SessionCardProps {
   session: ScheduledSession
   groups: TaskGroup[]
   onComplete: (assignmentId: string) => void
+  onLogTime: (assignmentId: string) => void
   onTimerStart: (sessionId: string, assignmentId: string) => void
   onTimerStop: () => void
   isActiveTimer: boolean
@@ -40,6 +41,7 @@ export function SessionCard({
   session,
   groups,
   onComplete,
+  onLogTime,
   onTimerStart,
   onTimerStop,
   isActiveTimer,
@@ -100,8 +102,32 @@ export function SessionCard({
         )}
       </div>
 
-      {/* Actions — always visible at low opacity, full on hover */}
-      <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
+      {/* Actions */}
+      <div className="flex items-center gap-1 shrink-0">
+        {/* Log time — always visible, colored */}
+        <button
+          onClick={() => onLogTime(session.assignment.id)}
+          className="flex items-center gap-1 text-[10px] font-mono border px-2 py-1 rounded transition-all"
+          style={{
+            color: accentColor,
+            borderColor: accentColor + '40',
+            background: accentColor + '10',
+          }}
+          onMouseEnter={(e) => {
+            ;(e.currentTarget as HTMLElement).style.borderColor = accentColor + '80'
+            ;(e.currentTarget as HTMLElement).style.background = accentColor + '20'
+          }}
+          onMouseLeave={(e) => {
+            ;(e.currentTarget as HTMLElement).style.borderColor = accentColor + '40'
+            ;(e.currentTarget as HTMLElement).style.background = accentColor + '10'
+          }}
+          title="Log time"
+        >
+          <Timer className="w-3 h-3" />
+          log time
+        </button>
+
+        {/* Timer start/stop */}
         <button
           onClick={() =>
             isActiveTimer
@@ -109,7 +135,7 @@ export function SessionCard({
               : onTimerStart(session.id, session.assignment.id)
           }
           className={cn(
-            'p-1.5 rounded transition-colors',
+            'p-1.5 rounded transition-colors opacity-40 group-hover:opacity-100',
             isActiveTimer
               ? 'text-red-400 hover:bg-red-500/15 hover:text-red-300'
               : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
@@ -122,9 +148,11 @@ export function SessionCard({
             <Play className="w-3.5 h-3.5" />
           )}
         </button>
+
+        {/* Complete */}
         <button
           onClick={() => onComplete(session.assignment.id)}
-          className="p-1.5 rounded text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+          className="p-1.5 rounded text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors opacity-40 group-hover:opacity-100"
           title="Mark complete"
         >
           <CheckCircle2 className="w-3.5 h-3.5" />

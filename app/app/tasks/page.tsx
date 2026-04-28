@@ -311,11 +311,11 @@ export default function TasksPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 {a.isCompleted ? (
                   <button
                     onClick={() => uncompleteAssignment(a.id)}
-                    className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all"
+                    className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all opacity-0 group-hover:opacity-100"
                   >
                     restore
                   </button>
@@ -323,14 +323,28 @@ export default function TasksPage() {
                   <>
                     <button
                       onClick={() => setLogTimeTask(a)}
-                      className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all"
+                      className="flex items-center gap-1 text-[10px] font-mono border px-2 py-1 rounded transition-all"
+                      style={{
+                        color: color,
+                        borderColor: color + '40',
+                        background: color + '10',
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.borderColor = color + '80'
+                        ;(e.currentTarget as HTMLElement).style.background = color + '20'
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.borderColor = color + '40'
+                        ;(e.currentTarget as HTMLElement).style.background = color + '10'
+                      }}
                       title="Log time"
                     >
                       <Timer className="w-3 h-3" />
+                      log time
                     </button>
                     <button
                       onClick={() => { setEditTask(a); setAddOpen(true) }}
-                      className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all"
+                      className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all opacity-0 group-hover:opacity-100"
                     >
                       edit
                     </button>

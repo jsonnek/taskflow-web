@@ -8,6 +8,7 @@ import { useTimer } from '@/hooks/use-timer'
 import { DayCard } from '@/components/timeline/DayCard'
 import { UnscheduledPanel } from '@/components/timeline/UnscheduledPanel'
 import { TimePromptDialog } from '@/components/tasks/TimePromptDialog'
+import { LogTimeDialog } from '@/components/tasks/LogTimeDialog'
 import { PgHeader } from '@/components/layout/PgHeader'
 import { isAtRisk } from '@/lib/scheduler'
 import type { Assignment } from '@/types'
@@ -20,13 +21,20 @@ function formatDueDate(iso: string): string {
 }
 
 export default function TimelinePage() {
-  const { assignments, groups, workBlocks, completeAssignment, addTimeEntry } = useStore()
+  const { assignments, groups, workBlocks, timeEntries, completeAssignment, addTimeEntry } = useStore()
   const schedule = useScheduler()
   const timer = useTimer()
   const [viewMode, setViewMode] = useState<ViewMode>('work-blocks')
 
   // Time prompt state
   const [pendingComplete, setPendingComplete] = useState<Assignment | null>(null)
+  // Log time state
+  const [logTimeTask, setLogTimeTask] = useState<Assignment | null>(null)
+
+  const handleLogTime = useCallback((id: string) => {
+    const a = assignments.find((x) => x.id === id)
+    if (a) setLogTimeTask(a)
+  }, [assignments])
 
   const unscheduledSet = useMemo(
     () => new Set(schedule.unscheduled.map((a) => a.id)),
@@ -142,6 +150,7 @@ export default function TimelinePage() {
               dayPlan={dayPlan}
               groups={groups}
               onComplete={handleComplete}
+              onLogTime={handleLogTime}
               onTimerStart={timer.start}
               onTimerStop={timer.stop}
               activeSessionId={timer.activeSessionId}
@@ -207,6 +216,26 @@ export default function TimelinePage() {
           estimatedMinutes={pendingComplete.estimatedMinutes}
           onSave={(mins, completedAt) => finishComplete(mins, completedAt)}
           onSkip={() => { completeAssignment(pendingComplete!.id); setPendingComplete(null) }}
+        />
+      )}
+
+      {/* Log time dialog */}
+      {logTimeTask && (
+        <LogTimeDialog
+          open={!!logTimeTask}
+          onOpenChange={(v) => { if (!v) setLogTimeTask(null) }}
+          taskTitle={logTimeTask.title}
+          estimatedMinutes={logTimeTask.estimatedMinutes}
+          alreadyLoggedMinutes={Math.round(
+            timeEntries
+              .filter((e) => e.assignmentId === logTimeTask.id && e.endedAt)
+              .reduce((s, e) => s + (new Date(e.endedAt!).getTime() - new Date(e.startedAt).getTime()) / 60000, 0)
+          )}
+          onSave={(minutes, endedAt) => {
+            const startedAt = new Date(new Date(endedAt).getTime() - minutes * 60000).toISOString()
+            addTimeEntry({ assignmentId: logTimeTask.id, startedAt, endedAt })
+            setLogTimeTask(null)
+          }}
         />
       )}
     </div>

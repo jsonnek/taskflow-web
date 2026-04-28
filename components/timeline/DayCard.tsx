@@ -10,6 +10,7 @@ interface DayCardProps {
   dayPlan: DayPlan
   groups: TaskGroup[]
   onComplete: (assignmentId: string) => void
+  onLogTime: (assignmentId: string) => void
   onTimerStart: (sessionId: string, assignmentId: string) => void
   onTimerStop: () => void
   activeSessionId: string | null
@@ -33,6 +34,7 @@ export function DayCard({
   dayPlan,
   groups,
   onComplete,
+  onLogTime,
   onTimerStart,
   onTimerStop,
   activeSessionId,
@@ -81,6 +83,7 @@ export function DayCard({
             session={session}
             groups={groups}
             onComplete={onComplete}
+            onLogTime={onLogTime}
             onTimerStart={onTimerStart}
             onTimerStop={onTimerStop}
             isActiveTimer={activeSessionId === session.id}
