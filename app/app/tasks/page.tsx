@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Plus, Search, CheckCircle2, Circle, Star, RotateCcw } from 'lucide-react'
+import { Plus, Search, CheckCircle2, Circle, Star, RotateCcw, Timer } from 'lucide-react'
 import { useStore } from '@/hooks/use-store'
 import { useScheduler } from '@/hooks/use-scheduler'
 import { isAtRisk } from '@/lib/scheduler'
 import { AddTaskSheet } from '@/components/tasks/AddTaskSheet'
 import { TimePromptDialog } from '@/components/tasks/TimePromptDialog'
+import { LogTimeDialog } from '@/components/tasks/LogTimeDialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -30,7 +31,7 @@ function formatDueDate(iso: string): string {
 }
 
 export default function TasksPage() {
-  const { assignments, groups, projects, completeAssignment, uncompleteAssignment, addTimeEntry } = useStore()
+  const { assignments, groups, projects, timeEntries, completeAssignment, uncompleteAssignment, addTimeEntry } = useStore()
   const schedule = useScheduler()
 
   const [search, setSearch] = useState('')
@@ -42,6 +43,7 @@ export default function TasksPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [editTask, setEditTask] = useState<Assignment | undefined>()
   const [pendingComplete, setPendingComplete] = useState<Assignment | null>(null)
+  const [logTimeTask, setLogTimeTask] = useState<Assignment | null>(null)
 
   const handleComplete = useCallback((id: string) => {
     const a = assignments.find((x) => x.id === id)
@@ -223,9 +225,16 @@ export default function TasksPage() {
           const group = groups.find((g) => g.name === a.subject)
           const color = group?.colorHex ?? '#6366F1'
           const project = projects.find((p) => p.id === a.projectId)
-          const atRisk = !a.isCompleted && isAtRisk(a, schedule.unscheduled)
+          const taskAtRisk = !a.isCompleted && isAtRisk(a, schedule.unscheduled)
           const days = daysUntil(a.dueDate)
           const overdue = days < 0
+
+          // Time logged for this task
+          const taskEntries = timeEntries.filter((e) => e.assignmentId === a.id && e.endedAt)
+          const loggedMins = Math.round(taskEntries.reduce((s, e) =>
+            s + (new Date(e.endedAt!).getTime() - new Date(e.startedAt).getTime()) / 60000, 0))
+          const logPct = Math.min((loggedMins / a.estimatedMinutes) * 100, 100)
+          const hasLogged = loggedMins > 0
 
           return (
             <div
@@ -249,10 +258,7 @@ export default function TasksPage() {
               </button>
 
               {/* Color accent */}
-              <div
-                className="w-0.5 self-stretch rounded-full shrink-0"
-                style={{ backgroundColor: color }}
-              />
+              <div className="w-0.5 self-stretch rounded-full shrink-0" style={{ backgroundColor: color }} />
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -260,7 +266,7 @@ export default function TasksPage() {
                     {a.title}
                   </span>
                   {a.isPriority && !a.isCompleted && <Star className="w-3 h-3 text-amber-400 shrink-0" />}
-                  {atRisk && (
+                  {taskAtRisk && (
                     <span className="text-[10px] font-mono font-medium text-red-400 bg-red-500/15 border border-red-500/30 px-1.5 py-0.5 rounded shrink-0">
                       at-risk
                     </span>
@@ -269,16 +275,11 @@ export default function TasksPage() {
 
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {a.subject && (
-                    <span
-                      className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: color + '22', color }}
-                    >
+                    <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: color + '22', color }}>
                       {a.subject}
                     </span>
                   )}
-                  {project && (
-                    <span className="text-[10px] font-mono text-muted-foreground">{project.name}</span>
-                  )}
+                  {project && <span className="text-[10px] font-mono text-muted-foreground">{project.name}</span>}
                   {a.isCompleted && a.completedAt ? (
                     <span className="text-[10px] mono-nums text-primary/60">
                       done {new Date(a.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -288,15 +289,25 @@ export default function TasksPage() {
                       {formatDueDate(a.dueDate)}
                     </span>
                   )}
-                  <span className="text-[10px] mono-nums text-muted-foreground">
-                    {a.estimatedMinutes}m
-                  </span>
-                  {!a.isCompleted && (
-                    <span className="text-[10px] font-mono text-muted-foreground/60">
-                      D:{a.difficulty} I:{a.importance}
+                  {/* Time progress */}
+                  {hasLogged ? (
+                    <span className="text-[10px] font-mono text-primary/70">
+                      {loggedMins}m / {a.estimatedMinutes}m
                     </span>
+                  ) : (
+                    <span className="text-[10px] mono-nums text-muted-foreground">{a.estimatedMinutes}m</span>
                   )}
                 </div>
+
+                {/* Time logged progress bar */}
+                {hasLogged && !a.isCompleted && (
+                  <div className="mt-1.5 h-0.5 bg-muted rounded-full overflow-hidden w-full max-w-xs">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${logPct}%`, background: color, boxShadow: `0 0 4px ${color}60` }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
@@ -305,17 +316,25 @@ export default function TasksPage() {
                   <button
                     onClick={() => uncompleteAssignment(a.id)}
                     className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all"
-                    title="Restore task"
                   >
                     restore
                   </button>
                 ) : (
-                  <button
-                    onClick={() => { setEditTask(a); setAddOpen(true) }}
-                    className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all"
-                  >
-                    edit
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setLogTimeTask(a)}
+                      className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all"
+                      title="Log time"
+                    >
+                      <Timer className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => { setEditTask(a); setAddOpen(true) }}
+                      className="text-[10px] font-mono text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 hover:bg-primary/10 px-2 py-1 rounded transition-all"
+                    >
+                      edit
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -337,6 +356,25 @@ export default function TasksPage() {
           estimatedMinutes={pendingComplete.estimatedMinutes}
           onSave={(mins, completedAt) => finishComplete(mins, completedAt)}
           onSkip={() => { completeAssignment(pendingComplete!.id); setPendingComplete(null) }}
+        />
+      )}
+
+      {logTimeTask && (
+        <LogTimeDialog
+          open={!!logTimeTask}
+          onOpenChange={(v) => { if (!v) setLogTimeTask(null) }}
+          taskTitle={logTimeTask.title}
+          estimatedMinutes={logTimeTask.estimatedMinutes}
+          alreadyLoggedMinutes={Math.round(
+            timeEntries
+              .filter((e) => e.assignmentId === logTimeTask.id && e.endedAt)
+              .reduce((s, e) => s + (new Date(e.endedAt!).getTime() - new Date(e.startedAt).getTime()) / 60000, 0)
+          )}
+          onSave={(minutes, endedAt) => {
+            const startedAt = new Date(new Date(endedAt).getTime() - minutes * 60000).toISOString()
+            addTimeEntry({ assignmentId: logTimeTask.id, startedAt, endedAt })
+            setLogTimeTask(null)
+          }}
         />
       )}
     </div>
