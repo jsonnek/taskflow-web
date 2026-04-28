@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { ChevronDown, ChevronUp, Minus, Plus, Search } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -79,6 +79,8 @@ export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId, d
   const [recDays, setRecDays] = useState<number[]>(editTask?.recurrenceRuleData?.daysOfWeek ?? [])
   const [recEndDate, setRecEndDate] = useState(editTask?.recurrenceRuleData?.endDate ?? '')
 
+  const [prereqSearch, setPrereqSearch] = useState('')
+
   const predictionFactor = subject ? predictionStore.getForSubject(subject) : undefined
   const predictedMinutes = predictionFactor ? Math.round(estimatedMinutes * predictionFactor.factor) : null
   const today = new Date().toISOString().split('T')[0]
@@ -135,6 +137,26 @@ export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId, d
   }
 
   const otherTasks = assignments.filter((a) => a.id !== editTask?.id && !a.isCompleted)
+
+  // Group and filter prerequisites
+  const filteredPrereqs = useMemo(() => {
+    const q = prereqSearch.toLowerCase()
+    return otherTasks.filter((a) => !q || a.title.toLowerCase().includes(q) || (a.subject ?? '').toLowerCase().includes(q))
+  }, [otherTasks, prereqSearch])
+
+  const prereqGroups = useMemo(() => {
+    const selected = filteredPrereqs.filter((a) => prerequisiteIds.includes(a.id))
+    const unselected = filteredPrereqs.filter((a) => !prerequisiteIds.includes(a.id))
+    // Group unselected by subject
+    const subjectMap = new Map<string, typeof unselected>()
+    for (const a of unselected) {
+      const key = a.subject || 'General'
+      const arr = subjectMap.get(key) ?? []
+      arr.push(a)
+      subjectMap.set(key, arr)
+    }
+    return { selected, bySubject: Array.from(subjectMap.entries()) }
+  }, [filteredPrereqs, prerequisiteIds])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -210,23 +232,64 @@ export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId, d
             </div>
 
             {/* Estimated time */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <SectionLabel>Estimated Time (minutes)</SectionLabel>
+                <SectionLabel>Estimated Time</SectionLabel>
                 {predictedMinutes !== null && predictedMinutes !== estimatedMinutes && (
-                  <span className="text-[10px] text-muted-foreground mono-nums">
-                    Predicted ~{predictedMinutes}m
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setEstimatedMinutes(predictedMinutes)}
+                    className="text-[10px] text-primary/70 hover:text-primary mono-nums border border-primary/20 hover:border-primary/50 hover:bg-primary/10 px-1.5 py-px rounded transition-all"
+                  >
+                    predicted ~{predictedMinutes}m
+                  </button>
                 )}
               </div>
-              <Input
-                type="number"
-                min={1}
-                max={480}
-                value={estimatedMinutes}
-                onChange={(e) => setEstimatedMinutes(Number(e.target.value))}
-                className="h-8 text-sm"
-              />
+              {/* Quick presets */}
+              <div className="flex gap-1 flex-wrap">
+                {[15, 30, 45, 60, 90, 120, 180].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setEstimatedMinutes(m)}
+                    className={`text-[11px] font-mono px-2 py-1 rounded border transition-all ${
+                      estimatedMinutes === m
+                        ? 'bg-primary/15 text-primary border-primary/50'
+                        : 'border-border text-muted-foreground hover:border-white/25 hover:text-foreground'
+                    }`}
+                  >
+                    {m < 60 ? `${m}m` : m === 60 ? '1h' : m === 90 ? '1h 30m' : `${m / 60}h`}
+                  </button>
+                ))}
+              </div>
+              {/* Stepper for custom values */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEstimatedMinutes((v) => Math.max(5, v - 5))}
+                  className="w-8 h-8 rounded border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-white/30 transition-colors shrink-0"
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <div className="flex-1 relative">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={480}
+                    value={estimatedMinutes}
+                    onChange={(e) => setEstimatedMinutes(Math.max(1, Number(e.target.value)))}
+                    className="h-8 text-sm text-center font-mono"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">min</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEstimatedMinutes((v) => Math.min(480, v + 5))}
+                  className="w-8 h-8 rounded border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-white/30 transition-colors shrink-0"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
             </div>
 
             {/* Difficulty + Importance side by side */}
@@ -286,24 +349,77 @@ export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId, d
                   {/* Prerequisites */}
                   {otherTasks.length > 0 && (
                     <div className="space-y-1.5">
-                      <SectionLabel>Must complete first</SectionLabel>
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto rounded-md border border-border p-2">
-                        {otherTasks.map((a) => (
-                          <button
-                            key={a.id}
-                            type="button"
-                            onClick={() => setPrerequisiteIds((prev) =>
-                              prev.includes(a.id) ? prev.filter((p) => p !== a.id) : [...prev, a.id]
-                            )}
-                            className={`text-xs px-2 py-0.5 rounded transition-colors ${
-                              prerequisiteIds.includes(a.id)
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted hover:bg-muted/80'
-                            }`}
-                          >
-                            {a.title}
-                          </button>
-                        ))}
+                      <div className="flex items-center justify-between">
+                        <SectionLabel>Must complete first</SectionLabel>
+                        {prerequisiteIds.length > 0 && (
+                          <span className="text-[10px] font-mono text-primary/70 border border-primary/30 bg-primary/10 px-1.5 py-px rounded">
+                            {prerequisiteIds.length} selected
+                          </span>
+                        )}
+                      </div>
+                      {/* Search */}
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+                        <Input
+                          placeholder="Filter tasks…"
+                          value={prereqSearch}
+                          onChange={(e) => setPrereqSearch(e.target.value)}
+                          className="h-7 text-xs pl-7"
+                        />
+                      </div>
+                      {/* Task list */}
+                      <div className="rounded-md border border-border overflow-y-auto max-h-40 divide-y divide-border/50">
+                        {/* Selected first */}
+                        {prereqGroups.selected.length > 0 && (
+                          <div className="p-1.5 space-y-1">
+                            {prereqGroups.selected.map((a) => {
+                              const g = groups.find((gr) => gr.name === a.subject)
+                              return (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  onClick={() => setPrerequisiteIds((prev) => prev.filter((p) => p !== a.id))}
+                                  className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded text-xs transition-all bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20"
+                                >
+                                  {g && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: g.colorHex }} />}
+                                  <span className="flex-1 truncate font-medium">{a.title}</span>
+                                  <span className="text-[9px] font-mono opacity-60 shrink-0">✓ remove</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                        {/* Unselected grouped by subject */}
+                        {prereqGroups.bySubject.length === 0 && prereqGroups.selected.length === 0 && (
+                          <p className="text-[11px] text-muted-foreground/50 text-center py-4">no tasks found</p>
+                        )}
+                        {prereqGroups.bySubject.map(([subjectName, tasks]) => {
+                          const g = groups.find((gr) => gr.name === subjectName)
+                          return (
+                            <div key={subjectName}>
+                              <div
+                                className="flex items-center gap-1.5 px-2 py-1 sticky top-0"
+                                style={{ background: 'var(--card)' }}
+                              >
+                                {g && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: g.colorHex }} />}
+                                <span className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/50">{subjectName}</span>
+                              </div>
+                              <div className="px-1.5 pb-1.5 space-y-0.5">
+                                {tasks.map((a) => (
+                                  <button
+                                    key={a.id}
+                                    type="button"
+                                    onClick={() => setPrerequisiteIds((prev) => [...prev, a.id])}
+                                    className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                                  >
+                                    {g && <span className="w-1.5 h-1.5 rounded-full shrink-0 opacity-50" style={{ background: g.colorHex }} />}
+                                    <span className="flex-1 truncate">{a.title}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   )}
