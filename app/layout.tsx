@@ -3,6 +3,7 @@ import { Inter, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { StoreProvider } from '@/hooks/use-store'
 import { TimerProvider } from '@/hooks/use-timer'
+import { SyncProvider } from '@/hooks/use-sync'
 import { ServiceWorkerRegistration } from '@/components/layout/ServiceWorkerRegistration'
 
 const inter = Inter({
@@ -39,10 +40,12 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-background text-foreground font-sans">
         <StoreProvider>
-          <TimerProvider>
-            <ServiceWorkerRegistration />
-            {children}
-          </TimerProvider>
+          <SyncProvider>
+            <TimerProvider>
+              <ServiceWorkerRegistration />
+              {children}
+            </TimerProvider>
+          </SyncProvider>
         </StoreProvider>
       </body>
     </html>

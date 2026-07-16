@@ -13,9 +13,11 @@ import {
   Home,
   ChevronRight,
   BookOpen,
+  UserCircle2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/hooks/use-store'
+import { useSync } from '@/hooks/use-sync'
 import * as stats from '@/lib/stats-aggregator'
 
 // Sidebar width for data variant
@@ -94,6 +96,17 @@ function SecLabel({ label }: { label: string }) {
 export function Sidebar() {
   const pathname = usePathname()
   const { assignments, groups, projects } = useStore()
+  const sync = useSync()
+
+  const syncLabel = !sync.configured
+    ? 'offline · local'
+    : !sync.userEmail
+      ? 'local · not signed in'
+      : sync.status === 'syncing'
+        ? 'syncing…'
+        : sync.status === 'error'
+          ? 'sync error'
+          : 'synced'
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   const toggle = (id: string) =>
@@ -236,8 +249,9 @@ export function Sidebar() {
 
         {/* Config */}
         <SecLabel label="// config" />
-        <NavItem href="/app/settings/work-blocks" label="work-blocks" icon={Clock} active={isActive('/app/settings/work-blocks')} />
-        <NavItem href="/app/settings/subjects"    label="subjects"    icon={Tag}   active={isActive('/app/settings/subjects')} />
+        <NavItem href="/app/settings/work-blocks" label="work-blocks" icon={Clock}       active={isActive('/app/settings/work-blocks')} />
+        <NavItem href="/app/settings/subjects"    label="subjects"    icon={Tag}         active={isActive('/app/settings/subjects')} />
+        <NavItem href="/app/settings/account"     label="account"     icon={UserCircle2} active={isActive('/app/settings/account')} />
       </nav>
 
       {/* Footer */}
@@ -262,7 +276,7 @@ export function Sidebar() {
           ))}
         </div>
         <p className="font-mono text-[9px] text-white/20 tracking-wider">
-          v4.0 · offline · local
+          v4.0 · {syncLabel}
         </p>
       </div>
     </aside>

@@ -1,3 +1,10 @@
+// Present on every persisted record — stamped by the store on write and used
+// by the sync engine for last-write-wins merging. Optional because records
+// created before sync existed won't have it.
+export interface Syncable {
+  updatedAt?: string // ISO
+}
+
 export interface RecurrenceRule {
   frequency: 'daily' | 'weekly' | 'specificDays' | 'monthly'
   daysOfWeek: number[] // 1=Sun…7=Sat
@@ -5,7 +12,7 @@ export interface RecurrenceRule {
   endDate?: string // ISO string
 }
 
-export interface Assignment {
+export interface Assignment extends Syncable {
   id: string
   title: string
   subject: string
@@ -27,7 +34,7 @@ export interface Assignment {
   createdAt: string // ISO string
 }
 
-export interface WorkBlock {
+export interface WorkBlock extends Syncable {
   id: string
   dayOfWeek: number // 1=Sun…7=Sat
   startHour: number
@@ -37,7 +44,7 @@ export interface WorkBlock {
   name: string
 }
 
-export interface Project {
+export interface Project extends Syncable {
   id: string
   name: string
   notes?: string
@@ -46,21 +53,21 @@ export interface Project {
   createdAt: string
 }
 
-export interface TaskGroup {
+export interface TaskGroup extends Syncable {
   id: string
   name: string
   colorHex: string
   createdAt: string
 }
 
-export interface TimeEntry {
+export interface TimeEntry extends Syncable {
   id: string
   assignmentId: string
   startedAt: string // ISO string
   endedAt?: string // ISO string
 }
 
-export interface Template {
+export interface Template extends Syncable {
   id: string
   name: string
   subject?: string
@@ -72,7 +79,8 @@ export interface Template {
 }
 
 // Prediction factor per subject (EWMA correction)
-export interface PredictionFactor {
+export interface PredictionFactor extends Syncable {
+  id?: string // = subject; set on write so the sync engine can key it
   subject: string
   factor: number // ratio: actual/estimated; 1.0 = perfect
   sampleCount: number
