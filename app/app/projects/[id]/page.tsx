@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { DateInput } from '@/components/ui/date-input'
 import type { Assignment, Project } from '@/types'
+import { localDateString, localDateOfISO } from '@/lib/utils'
 
 type SortKey = 'manual' | 'priority' | 'dueDate' | 'time'
 type FilterKey = 'all' | 'incomplete' | 'completed'
@@ -63,14 +64,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [editOpen, setEditOpen] = useState(false)
   const [projName, setProjName] = useState(project?.name ?? '')
   const [projNotes, setProjNotes] = useState(project?.notes ?? '')
-  const [projDue, setProjDue] = useState(project?.dueDate ? project.dueDate.split('T')[0] : '')
+  const [projDue, setProjDue] = useState(project?.dueDate ? localDateOfISO(project.dueDate) : '')
   const [projGroupId, setProjGroupId] = useState(project?.groupId ?? '')
 
   // List controls
   const [sortKey, setSortKey] = useState<SortKey>('manual')
   const [filter, setFilter] = useState<FilterKey>('incomplete')
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDateString(new Date())
 
   const projectTasks = useMemo(
     () => assignments.filter((a) => a.projectId === id),
@@ -147,7 +148,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   function openEditProject() {
     setProjName(project?.name ?? '')
     setProjNotes(project?.notes ?? '')
-    setProjDue(project?.dueDate ? project.dueDate.split('T')[0] : '')
+    setProjDue(project?.dueDate ? localDateOfISO(project.dueDate) : '')
     setProjGroupId(project?.groupId ?? '')
     setEditOpen(true)
   }

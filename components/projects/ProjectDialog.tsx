@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { DateInput } from '@/components/ui/date-input'
 import { useStore } from '@/hooks/use-store'
 import type { Project } from '@/types'
+import { localDateString, localDateOfISO } from '@/lib/utils'
 
 interface ProjectDialogProps {
   open: boolean
@@ -21,11 +22,11 @@ interface ProjectDialogProps {
 
 export function ProjectDialog({ open, onOpenChange, editProject, defaultGroupId }: ProjectDialogProps) {
   const { groups, addProject, updateProject } = useStore()
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDateString(new Date())
 
   const [name, setName]       = useState(editProject?.name ?? '')
   const [notes, setNotes]     = useState(editProject?.notes ?? '')
-  const [dueDate, setDueDate] = useState(editProject?.dueDate ? editProject.dueDate.split('T')[0] : '')
+  const [dueDate, setDueDate] = useState(editProject?.dueDate ? localDateOfISO(editProject.dueDate) : '')
   const [groupId, setGroupId] = useState(editProject?.groupId ?? defaultGroupId ?? '')
 
   function handleSubmit(e: React.FormEvent) {

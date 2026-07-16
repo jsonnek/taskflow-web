@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useStore } from '@/hooks/use-store'
 import { PgHeader } from '@/components/layout/PgHeader'
 import * as stats from '@/lib/stats-aggregator'
+import { localDateString, localDateOfISO } from '@/lib/utils'
 import { useScheduler } from '@/hooks/use-scheduler'
 
 function daysUntil(iso: string): number {
@@ -41,10 +42,10 @@ export default function HomePage() {
 
   // Time logged today
   const loggedTodayMins = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = localDateString(new Date())
     return Math.round(
       timeEntries
-        .filter((e) => e.endedAt && e.endedAt.startsWith(todayStr))
+        .filter((e) => e.endedAt && localDateOfISO(e.endedAt) === todayStr)
         .reduce((s, e) => s + (new Date(e.endedAt!).getTime() - new Date(e.startedAt).getTime()) / 60000, 0)
     )
   }, [timeEntries])
@@ -56,7 +57,7 @@ export default function HomePage() {
         .filter((a) => !a.isCompleted)
         .map((a) => ({ ...a, days: daysUntil(a.dueDate) }))
         .filter((a) => a.days <= 1)
-        .sort((a, b) => a.days - b.days || (b.isPriority ? 1 : -1))
+        .sort((a, b) => a.days - b.days || Number(b.isPriority) - Number(a.isPriority))
         .slice(0, 5),
     [assignments]
   )

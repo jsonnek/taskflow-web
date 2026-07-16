@@ -14,14 +14,31 @@ import type {
   HeatmapCell,
 } from '@/types'
 
-function dateOnly(iso: string): string {
-  return iso.split('T')[0]
-}
+import { localDateString, localDateOfISO } from '@/lib/utils'
+
+// Local calendar date of a stored ISO timestamp — splitting the raw string
+// would give the UTC date, off by one for evening activity outside UTC.
+const dateOnly = localDateOfISO
 
 function addDays(d: Date, n: number): Date {
   const r = new Date(d)
   r.setDate(r.getDate() + n)
   return r
+}
+
+function entryMinutes(e: TimeEntry): number {
+  return (new Date(e.endedAt!).getTime() - new Date(e.startedAt).getTime()) / 60000
+}
+
+// Total logged minutes per assignment, one pass over the entries — callers
+// were previously re-filtering the full entry list per assignment.
+function loggedMinutesByAssignment(timeEntries: TimeEntry[]): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const e of timeEntries) {
+    if (!e.endedAt) continue
+    map.set(e.assignmentId, (map.get(e.assignmentId) ?? 0) + entryMinutes(e))
+  }
+  return map
 }
 
 // 1. Daily completions (14-day rolling window)
@@ -33,13 +50,17 @@ export function dailyCompletions(
   today.setHours(0, 0, 0, 0)
   const result: DailyCompletionPoint[] = []
 
+  const countByDate = new Map<string, number>()
+  for (const a of assignments) {
+    if (!a.isCompleted || !a.completedAt) continue
+    const date = dateOnly(a.completedAt)
+    countByDate.set(date, (countByDate.get(date) ?? 0) + 1)
+  }
+
   for (let i = days - 1; i >= 0; i--) {
     const d = addDays(today, -i)
-    const dateStr = d.toISOString().split('T')[0]
-    const count = assignments.filter(
-      (a) => a.isCompleted && a.completedAt && dateOnly(a.completedAt) === dateStr
-    ).length
-    result.push({ date: dateStr, count })
+    const dateStr = localDateString(d)
+    result.push({ date: dateStr, count: countByDate.get(dateStr) ?? 0 })
   }
   return result
 }
@@ -49,11 +70,13 @@ export function completionRate(assignments: Assignment[]): CompletionRateResult 
   const roots = assignments.filter((a) => !a.recurrenceParentId)
   const total = roots.length
   const completed = roots.filter((a) => a.isCompleted).length
+  // On-time = completed on or before the due *day* (due dates are stored as
+  // midnight, so a timestamp comparison would count same-day completions late)
   const onTimeCount = roots.filter(
     (a) =>
       a.isCompleted &&
       a.completedAt &&
-      new Date(a.completedAt) <= new Date(a.dueDate)
+      dateOnly(a.completedAt) <= dateOnly(a.dueDate)
   ).length
   return {
     completed,
@@ -77,7 +100,7 @@ export function streaks(assignments: Assignment[]): StreakResult {
   // Current streak
   let currentStreak = 0
   let cursor = new Date(today)
-  while (completedDates.has(cursor.toISOString().split('T')[0])) {
+  while (completedDates.has(localDateString(cursor))) {
     currentStreak++
     cursor = addDays(cursor, -1)
   }
@@ -109,28 +132,21 @@ export function timeByGroup(
   groups: TaskGroup[]
 ): GroupTimePoint[] {
   const map = new Map<string, { estimated: number; logged: number }>()
+  const loggedByAssignment = loggedMinutesByAssignment(timeEntries)
+  const groupByName = new Map(groups.map((g) => [g.name, g]))
 
   for (const a of assignments) {
     if (!a.subject) continue
     const existing = map.get(a.subject) ?? { estimated: 0, logged: 0 }
     existing.estimated += a.estimatedMinutes
-
-    const logged = timeEntries
-      .filter((e) => e.assignmentId === a.id && e.endedAt)
-      .reduce((sum, e) => {
-        const mins =
-          (new Date(e.endedAt!).getTime() - new Date(e.startedAt).getTime()) /
-          60000
-        return sum + mins
-      }, 0)
-    existing.logged += logged
+    existing.logged += loggedByAssignment.get(a.id) ?? 0
     map.set(a.subject, existing)
   }
 
   return Array.from(map.entries())
     .filter(([, v]) => v.logged > 0 || v.estimated > 0)
     .map(([subject, v]) => {
-      const group = groups.find((g) => g.name === subject)
+      const group = groupByName.get(subject)
       return {
         subject,
         estimatedMinutes: Math.round(v.estimated),
@@ -149,16 +165,10 @@ export function overallTimeAccuracy(
   let totalEstimated = 0
   let totalLogged = 0
 
+  const loggedByAssignment = loggedMinutesByAssignment(timeEntries)
   for (const a of assignments) {
-    const entries = timeEntries.filter((e) => e.assignmentId === a.id && e.endedAt)
-    if (entries.length === 0) continue
-    const logged = entries.reduce((sum, e) => {
-      return (
-        sum +
-        (new Date(e.endedAt!).getTime() - new Date(e.startedAt).getTime()) /
-          60000
-      )
-    }, 0)
+    const logged = loggedByAssignment.get(a.id)
+    if (logged === undefined) continue
     totalEstimated += a.estimatedMinutes
     totalLogged += logged
   }
@@ -237,24 +247,24 @@ export function predictionAccuracyTrend(
   today.setHours(0, 0, 0, 0)
   const result: { date: string; accuracy: number }[] = []
 
+  const loggedByAssignment = loggedMinutesByAssignment(timeEntries)
+  const completedByDate = new Map<string, Assignment[]>()
+  for (const a of assignments) {
+    if (!a.isCompleted || !a.completedAt) continue
+    const date = dateOnly(a.completedAt)
+    const arr = completedByDate.get(date) ?? []
+    arr.push(a)
+    completedByDate.set(date, arr)
+  }
+
   for (let i = days - 1; i >= 0; i--) {
     const d = addDays(today, -i)
-    const dateStr = d.toISOString().split('T')[0]
-    const completed = assignments.filter(
-      (a) => a.isCompleted && a.completedAt && dateOnly(a.completedAt) === dateStr
-    )
+    const dateStr = localDateString(d)
+    const completed = completedByDate.get(dateStr) ?? []
     const accuracies = completed
       .map((a) => {
-        const entries = timeEntries.filter((e) => e.assignmentId === a.id && e.endedAt)
-        if (entries.length === 0) return null
-        const logged = entries.reduce(
-          (s, e) =>
-            s +
-            (new Date(e.endedAt!).getTime() - new Date(e.startedAt).getTime()) /
-              60000,
-          0
-        )
-        return logged > 0 ? a.estimatedMinutes / logged : null
+        const logged = loggedByAssignment.get(a.id)
+        return logged ? a.estimatedMinutes / logged : null
       })
       .filter((v): v is number => v !== null)
 
@@ -271,22 +281,29 @@ export function predictionAccuracyTrend(
 // 9. Workload gauge
 export function workloadGauge(
   dayPlans: DayPlan[],
-  workBlocks: WorkBlock[]
+  workBlocks: WorkBlock[],
+  daysAhead = 28 // must match the horizon the plan was generated with
 ): { scheduledMinutes: number; availableMinutes: number; utilizationRatio: number } {
   const scheduled = dayPlans.reduce(
     (s, d) => s + d.sessions.reduce((ss, sess) => ss + sess.duration, 0),
     0
   )
-  // Available over same window
-  const days = dayPlans.length
-  const avgDailyAvailable =
-    workBlocks.reduce(
-      (s, b) =>
-        s + (b.endHour * 60 + b.endMinute - (b.startHour * 60 + b.startMinute)),
-      0
-    ) / 7 // per day average
 
-  const available = avgDailyAvailable * days
+  // Actual block capacity over the plan window, walking real weekdays —
+  // dayPlans only contains days that received sessions, so its length (and a
+  // 7-day average) would misstate availability.
+  const minutesByWeekday = new Array<number>(8).fill(0) // 1=Sun…7=Sat
+  for (const b of workBlocks) {
+    minutesByWeekday[b.dayOfWeek] +=
+      b.endHour * 60 + b.endMinute - (b.startHour * 60 + b.startMinute)
+  }
+  let available = 0
+  const cursor = new Date()
+  cursor.setHours(0, 0, 0, 0)
+  for (let i = 0; i < daysAhead; i++) {
+    available += minutesByWeekday[cursor.getDay() + 1]
+    cursor.setDate(cursor.getDate() + 1)
+  }
 
   return {
     scheduledMinutes: scheduled,

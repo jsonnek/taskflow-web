@@ -13,7 +13,9 @@ interface DayCardProps {
   onLogTime: (assignmentId: string) => void
   onTimerStart: (sessionId: string, assignmentId: string) => void
   onTimerStop: () => void
-  activeSessionId: string | null
+  // Matched by assignment (not session) — scheduler session ids are
+  // regenerated on every plan, so they don't survive reloads.
+  activeAssignmentId: string | null
   elapsedSeconds: number
   unscheduledIds: Set<string>
 }
@@ -37,12 +39,12 @@ export function DayCard({
   onLogTime,
   onTimerStart,
   onTimerStop,
-  activeSessionId,
+  activeAssignmentId,
   elapsedSeconds,
   unscheduledIds,
 }: DayCardProps) {
   const { weekday, date, isToday } = formatDate(dayPlan.date)
-  const isOverScheduled = dayPlan.blockPlans.some((bp) => bp.fillRatio > 1)
+  const hasWarnings = dayPlan.warnings.length > 0
 
   return (
     <div className={cn('space-y-2', isToday && 'relative')}>
@@ -58,22 +60,25 @@ export function DayCard({
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{date}</span>
-          {isOverScheduled && (
+          {hasWarnings && (
             <span className="flex items-center gap-1 text-amber-400 font-medium">
               <AlertTriangle className="w-3 h-3" />
-              Over-scheduled
+              At risk
             </span>
           )}
         </div>
       </div>
 
-      {/* Over-scheduled warning */}
-      {isOverScheduled && (
-        <div className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-400">
+      {/* Scheduling warnings */}
+      {dayPlan.warnings.map((warning) => (
+        <div
+          key={warning}
+          className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-400"
+        >
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          More work scheduled than available time today.
+          {warning}
         </div>
-      )}
+      ))}
 
       {/* Sessions */}
       <div className="space-y-1.5 ml-13">
@@ -86,7 +91,7 @@ export function DayCard({
             onLogTime={onLogTime}
             onTimerStart={onTimerStart}
             onTimerStop={onTimerStop}
-            isActiveTimer={activeSessionId === session.id}
+            isActiveTimer={activeAssignmentId === session.assignment.id}
             elapsedSeconds={elapsedSeconds}
             isAtRisk={unscheduledIds.has(session.assignment.id)}
           />

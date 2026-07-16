@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useStore } from '@/hooks/use-store'
 import { useKeyboard } from '@/hooks/use-keyboard'
 import { DateInput } from '@/components/ui/date-input'
+import { localDateString } from '@/lib/utils'
 
 export function QuickCapture() {
   const [open, setOpen] = useState(false)
@@ -30,7 +31,7 @@ export function QuickCapture() {
       title: title.trim(),
       subject: subject || 'General',
       dueDate: dueDate
-        ? new Date(dueDate).toISOString()
+        ? new Date(dueDate + 'T00:00:00').toISOString()
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       estimatedMinutes: 30,
       difficulty: 3,
@@ -47,7 +48,7 @@ export function QuickCapture() {
     setOpen(false)
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDateString(new Date())
 
   return (
     <>

@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import { DateInput } from '@/components/ui/date-input'
 import { useStore } from '@/hooks/use-store'
 import { predictionStore } from '@/lib/store'
+import { localDateString, localDateOfISO } from '@/lib/utils'
 import type { Assignment, RecurrenceRule, Template } from '@/types'
 
 interface AddTaskSheetProps {
@@ -58,7 +59,7 @@ export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId, d
 
   const [title, setTitle] = useState(editTask?.title ?? '')
   const [subject, setSubject] = useState(editTask?.subject ?? defaultSubject ?? '')
-  const [dueDate, setDueDate] = useState(editTask?.dueDate ? editTask.dueDate.split('T')[0] : '')
+  const [dueDate, setDueDate] = useState(editTask?.dueDate ? localDateOfISO(editTask.dueDate) : '')
   const [estimatedMinutes, setEstimatedMinutes] = useState(editTask?.estimatedMinutes ?? 30)
   const [difficulty, setDifficulty] = useState(editTask?.difficulty ?? 3)
   const [importance, setImportance] = useState(editTask?.importance ?? 3)
@@ -83,7 +84,7 @@ export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId, d
 
   const predictionFactor = subject ? predictionStore.getForSubject(subject) : undefined
   const predictedMinutes = predictionFactor ? Math.round(estimatedMinutes * predictionFactor.factor) : null
-  const today = new Date().toISOString().split('T')[0]
+  const today = localDateString(new Date())
   const selectedGroup = groups.find((g) => g.name === subject)
 
   function loadTemplate(t: Template) {
@@ -113,7 +114,7 @@ export function AddTaskSheet({ open, onOpenChange, editTask, defaultProjectId, d
       title: title.trim(),
       subject: subject || 'General',
       dueDate: dueDate
-        ? new Date(dueDate).toISOString()
+        ? new Date(dueDate + 'T00:00:00').toISOString()
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       estimatedMinutes,
       difficulty,

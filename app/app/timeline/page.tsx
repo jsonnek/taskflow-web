@@ -11,6 +11,7 @@ import { TimePromptDialog } from '@/components/tasks/TimePromptDialog'
 import { LogTimeDialog } from '@/components/tasks/LogTimeDialog'
 import { PgHeader } from '@/components/layout/PgHeader'
 import { isAtRisk } from '@/lib/scheduler'
+import { localDateOfISO } from '@/lib/utils'
 import type { Assignment } from '@/types'
 
 type ViewMode = 'work-blocks' | 'due-dates'
@@ -41,7 +42,10 @@ export default function TimelinePage() {
     [schedule.unscheduled]
   )
 
-  const incomplete = assignments.filter((a) => !a.isCompleted)
+  const incomplete = useMemo(
+    () => assignments.filter((a) => !a.isCompleted),
+    [assignments]
+  )
 
   // Intercept completion — show time prompt first
   const handleComplete = useCallback((id: string) => {
@@ -52,6 +56,7 @@ export default function TimelinePage() {
 
   function finishComplete(actualMinutes: number, completedAt: string) {
     if (!pendingComplete) return
+    if (timer.activeAssignmentId === pendingComplete.id) timer.stop()
     if (actualMinutes > 0) {
       const endedAt = new Date(completedAt)
       const startedAt = new Date(endedAt.getTime() - actualMinutes * 60000)
@@ -72,7 +77,7 @@ export default function TimelinePage() {
     for (const a of [...incomplete].sort(
       (x, y) => new Date(x.dueDate).getTime() - new Date(y.dueDate).getTime()
     )) {
-      const key = a.dueDate.split('T')[0]
+      const key = localDateOfISO(a.dueDate)
       const arr = map.get(key) ?? []
       arr.push(a)
       map.set(key, arr)
@@ -153,7 +158,7 @@ export default function TimelinePage() {
               onLogTime={handleLogTime}
               onTimerStart={timer.start}
               onTimerStop={timer.stop}
-              activeSessionId={timer.activeSessionId}
+              activeAssignmentId={timer.activeAssignmentId}
               elapsedSeconds={timer.elapsedSeconds}
               unscheduledIds={unscheduledSet}
             />

@@ -6,8 +6,10 @@ import type {
   WorkBlockPlan,
   DayPlan,
   ScheduleResult,
+  PredictionFactor,
 } from '@/types'
 import { nanoid } from 'nanoid'
+import { localDateString } from '@/lib/utils'
 
 function blockDuration(b: WorkBlock): number {
   return (b.endHour * 60 + b.endMinute) - (b.startHour * 60 + b.startMinute)
@@ -48,9 +50,7 @@ export function priorityScore(
   )
 }
 
-function dateString(d: Date): string {
-  return d.toISOString().split('T')[0]
-}
+const dateString = localDateString
 
 function addDays(d: Date, n: number): Date {
   const result = new Date(d)
@@ -65,12 +65,16 @@ function weekdayNumber(d: Date): number {
 
 interface QItem {
   assignment: Assignment
+  plannedMinutes: number // estimate after prediction-factor adjustment
   remainingMinutes: number
-  availableFrom: Date // distantFuture if blocked
+  blocked: boolean // has incomplete, unscheduled prerequisites
+  availableFrom: Date // earliest day this item may be scheduled (once unblocked)
   effectiveDue: Date
+  // Last day (local YYYY-MM-DD) this item may be scheduled. Tasks already
+  // overdue when the plan is generated are clamped to today so they still
+  // get scheduled ASAP instead of being dropped.
+  dueDay: string
 }
-
-const DISTANT_FUTURE = new Date('2099-01-01')
 
 export function isBlocked(assignment: Assignment, allAssignments: Assignment[]): boolean {
   return assignment.prerequisiteIds.some((pid) => {
@@ -83,24 +87,55 @@ export function generatePlan(
   assignments: Assignment[],
   workBlocks: WorkBlock[],
   projects: Project[],
+  predictionFactors: PredictionFactor[] = [],
   daysAhead = 28,
   now = new Date()
 ): ScheduleResult {
   const incomplete = assignments.filter((a) => !a.isCompleted)
 
+  // Correct estimates by the per-subject EWMA accuracy factor once there's
+  // enough history to trust it. Clamped so one wild outlier can't blow up
+  // (or starve) the schedule.
+  const factorBySubject = new Map(
+    predictionFactors
+      .filter((f) => f.sampleCount >= 2)
+      .map((f) => [f.subject, clamp(f.factor, 0.5, 2)])
+  )
+  const adjustedMinutes = (a: Assignment): number => {
+    const factor = factorBySubject.get(a.subject) ?? 1
+    return Math.max(1, Math.round(a.estimatedMinutes * factor))
+  }
+
   // Midnight of today — unblocked tasks are available from start of day, not current time
   const todayMidnight = new Date(now)
   todayMidnight.setHours(0, 0, 0, 0)
 
+  const assignmentById = new Map(assignments.map((a) => [a.id, a]))
+  const isBlockedById = (a: Assignment): boolean =>
+    a.prerequisiteIds.some((pid) => {
+      const prereq = assignmentById.get(pid)
+      return prereq ? !prereq.isCompleted : false
+    })
+
   // Build queue sorted by priority (highest first)
   const queue: QItem[] = incomplete
     .sort((a, b) => priorityScore(b, projects, now) - priorityScore(a, projects, now))
-    .map((a) => ({
-      assignment: a,
-      remainingMinutes: Math.max(1, a.estimatedMinutes),
-      availableFrom: isBlocked(a, assignments) ? DISTANT_FUTURE : todayMidnight,
-      effectiveDue: effectiveDueDate(a, projects),
-    }))
+    .map((a) => {
+      const effectiveDue = effectiveDueDate(a, projects)
+      const dueDay = effectiveDue < todayMidnight
+        ? dateString(todayMidnight)
+        : dateString(effectiveDue)
+      const planned = adjustedMinutes(a)
+      return {
+        assignment: a,
+        plannedMinutes: planned,
+        remainingMinutes: planned,
+        blocked: isBlockedById(a),
+        availableFrom: todayMidnight,
+        effectiveDue,
+        dueDay,
+      }
+    })
 
   // Track which sessions have been scheduled (for unlocking deps)
   const scheduledIds = new Set<string>(
@@ -116,6 +151,24 @@ export function generatePlan(
     const dayStr = dateString(day)
     const weekday = weekdayNumber(day)
 
+    const warnings: string[] = []
+
+    // Expire items whose due day has passed with work still remaining —
+    // they can no longer be scheduled and surface as unscheduled/at-risk.
+    for (let i = queue.length - 1; i >= 0; i--) {
+      const item = queue[i]
+      if (item.dueDay < dayStr && item.remainingMinutes > 0) {
+        const started = item.remainingMinutes < item.plannedMinutes
+        warnings.push(
+          started
+            ? `"${item.assignment.title}" could not be finished before its due date`
+            : `"${item.assignment.title}" could not be scheduled before its due date`
+        )
+        unscheduled.push(item.assignment)
+        queue.splice(i, 1)
+      }
+    }
+
     // Blocks for this weekday, deduplicated by start time
     const blocksToday = workBlocks
       .filter((b) => b.dayOfWeek === weekday)
@@ -125,7 +178,12 @@ export function generatePlan(
         return blockStartMinutes(b) !== blockStartMinutes(arr[idx - 1])
       })
 
-    if (blocksToday.length === 0) continue
+    if (blocksToday.length === 0) {
+      if (warnings.length > 0) {
+        dayPlans.push({ date: dayStr, blockPlans: [], sessions: [], warnings })
+      }
+      continue
+    }
 
     const blockPlans: WorkBlockPlan[] = blocksToday.map((b) => ({
       block: b,
@@ -135,18 +193,13 @@ export function generatePlan(
       fillRatio: 0,
     }))
 
-    const warnings: string[] = []
-
     for (const bp of blockPlans) {
       const capacity = blockDuration(bp.block)
       if (capacity <= 0) continue
 
       for (const item of queue) {
         if (item.remainingMinutes <= 0) continue
-        if (item.availableFrom > day) continue
-
-        // Skip only if due date is strictly in the future AND this day is past it
-        // Overdue tasks (effectiveDue < today) should still be scheduled ASAP
+        if (item.blocked || item.availableFrom > day) continue
 
         const freeSpace = capacity - bp.usedMinutes
         if (freeSpace <= 0) break
@@ -172,23 +225,22 @@ export function generatePlan(
 
         if (item.remainingMinutes <= 0) {
           scheduledIds.add(item.assignment.id)
-          // Unlock dependents
+          // Unlock dependents whose prerequisites are now all completed or
+          // fully scheduled. Prerequisite ids that no longer resolve to an
+          // assignment (deleted tasks) are ignored.
           for (const dep of queue) {
             if (
-              dep.availableFrom === DISTANT_FUTURE &&
-              dep.assignment.prerequisiteIds.every((pid) => scheduledIds.has(pid))
+              dep.blocked &&
+              dep.assignment.prerequisiteIds.every(
+                (pid) => scheduledIds.has(pid) || !assignmentById.has(pid)
+              )
             ) {
+              dep.blocked = false
               dep.availableFrom = day
             }
           }
         }
 
-        if (!fits && item.assignment.isSplittable) {
-          // Warn if due today and still has remaining
-          if (dateString(item.effectiveDue) === dayStr && item.remainingMinutes > 0) {
-            warnings.push(`"${item.assignment.title}" may not finish by due date`)
-          }
-        }
       }
 
       bp.freeMinutes = capacity - bp.usedMinutes
@@ -197,14 +249,15 @@ export function generatePlan(
 
     const sessions = blockPlans.flatMap((bp) => bp.sessions)
 
-    // Over-scheduled warning
-    const totalUsed = blockPlans.reduce((s, bp) => s + bp.usedMinutes, 0)
-    const totalCapacity = blockPlans.reduce((s, bp) => s + blockDuration(bp.block), 0)
-    if (totalUsed > totalCapacity) {
-      warnings.push('Over-scheduled: more work than available time')
+    // Anything due today that still has remaining work won't make its deadline
+    // — warn even if it never received a session (it will expire tomorrow).
+    for (const item of queue) {
+      if (item.dueDay === dayStr && item.remainingMinutes > 0) {
+        warnings.push(`"${item.assignment.title}" may not finish by its due date`)
+      }
     }
 
-    if (sessions.length > 0) {
+    if (sessions.length > 0 || warnings.length > 0) {
       dayPlans.push({ date: dayStr, blockPlans, sessions, warnings })
     }
   }
